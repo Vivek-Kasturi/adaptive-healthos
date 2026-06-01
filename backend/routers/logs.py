@@ -3,7 +3,7 @@ Log routes — food, workout, weight, sleep.
 Each endpoint triggers the appropriate agent pipeline.
 """
 from fastapi import APIRouter
-from models.schemas import FoodLogRequest, WorkoutLogRequest, WeightLogRequest
+from models.schemas import FoodLogRequest, WorkoutLogRequest, WeightLogRequest, SleepLogRequest
 from tools.mongodb_tools import insert_health_log, award_xp, update_streak, log_agent_decision, get_recent_logs
 import logging
 
@@ -148,28 +148,33 @@ async def log_weight(request: WeightLogRequest):
 
 
 @router.post("/sleep")
-async def log_sleep(user_id: str, hours: float, quality_score: int = 7, notes: str = ""):
+async def log_sleep(request: SleepLogRequest):
+    """Log sleep → RecoveryAgent analyzes → workout intensity adjusted if needed."""
+    from agents.runner import run_agent
+    from agents.recovery_agent import recovery_agent
+
     log_id = await insert_health_log({
-        "user_id": user_id,
+        "user_id": request.user_id,
         "type": "sleep",
-        "data": {"hours": hours, "quality_score": quality_score, "notes": notes},
+        "data": {
+            "hours": request.hours,
+            "quality_score": request.quality_score,
+            "notes": request.notes or "",
+        },
     })
 
-    recovery_msg = "Good recovery." if hours >= 7 and quality_score >= 6 else "Recovery may be insufficient — consider adjusting tomorrow's workout intensity."
-
-    await log_agent_decision({
-        "user_id": user_id,
-        "agent_name": "RecoveryAgent",
-        "trigger": "sleep_log",
-        "decision": f"Sleep {hours}h, quality {quality_score}/10. {recovery_msg}",
-        "actions_taken": ["insert_health_log", "assess_recovery"],
-    })
-    await award_xp(user_id, 10, "Sleep logged")
-    await update_streak(user_id)
+    agent_prompt = (
+        f"Analyze sleep log for user_id={request.user_id}. "
+        f"Sleep: {request.hours} hours, quality: {request.quality_score}/10. "
+        f"Check recent sleep history, assess recovery, adjust workout plan if needed. "
+        f"Award 10 XP for logging sleep."
+    )
+    result = await run_agent(recovery_agent, user_id=request.user_id, message=agent_prompt)
+    logger.info(f"Sleep logged for {request.user_id} | tools={result['tools_used']}")
 
     return {
         "log_id": log_id,
         "agent_name": "RecoveryAgent",
-        "agent_response": f"{hours}h sleep logged (quality {quality_score}/10). {recovery_msg} +10 XP!",
-        "tools_used": ["insert_health_log", "log_agent_decision"],
+        "agent_response": result["response"],
+        "tools_used": result["tools_used"],
     }

@@ -79,9 +79,9 @@ export default function AgentActivityPanel({ userId }: Props) {
                   <p className="text-gray-300 text-xs mt-0.5 leading-relaxed">
                     {d.decision}
                   </p>
-                  {d.actions_taken.length > 0 && (
+                  {(d.actions_taken ?? []).length > 0 && (
                     <div className="flex gap-1 mt-1 flex-wrap">
-                      {d.actions_taken.map((a, j) => (
+                      {(d.actions_taken ?? []).map((a, j) => (
                         <span key={j} className="text-xs bg-gray-800 text-gray-400 px-1.5 py-0.5 rounded">
                           {a}
                         </span>

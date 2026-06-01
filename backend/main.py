@@ -94,7 +94,7 @@ async def get_agent_decisions_path(user_id: str, limit: int = 10):
 
 
 # Routers
-from routers import users, logs, chat, plans, gamification, progress
+from routers import users, logs, chat, plans, gamification, progress, demo
 
 app.include_router(users.router, prefix="/api/users", tags=["users"])
 app.include_router(logs.router, prefix="/api/logs", tags=["logs"])
@@ -102,6 +102,7 @@ app.include_router(chat.router, prefix="/api/chat", tags=["chat"])
 app.include_router(plans.router, prefix="/api/plans", tags=["plans"])
 app.include_router(gamification.router, prefix="/api/gamification", tags=["gamification"])
 app.include_router(progress.router, prefix="/api/progress", tags=["progress"])
+app.include_router(demo.router, prefix="/api/demo", tags=["demo"])
 
 
 @app.get("/api/forecasts/latest")

@@ -49,6 +49,13 @@ class WeightLogRequest(BaseModel):
     notes: Optional[str] = None
 
 
+class SleepLogRequest(BaseModel):
+    user_id: str
+    hours: float
+    quality_score: int = 7
+    notes: Optional[str] = None
+
+
 class ChatRequest(BaseModel):
     user_id: str
     message: str
