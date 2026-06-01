@@ -1,0 +1,84 @@
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+from contextlib import asynccontextmanager
+from motor.motor_asyncio import AsyncIOMotorClient
+from config import get_settings
+import logging
+
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+settings = get_settings()
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Startup
+    logger.info("Starting Adaptive HealthOS backend")
+    logger.info(f"Project: {settings.google_cloud_project}")
+    logger.info(f"Model: {settings.gemini_model}")
+
+    # Test MongoDB connection on startup
+    try:
+        client = AsyncIOMotorClient(settings.mongodb_uri, serverSelectionTimeoutMS=5000)
+        await client.admin.command("ping")
+        logger.info("✓ MongoDB connection verified")
+        app.state.mongo_client = client
+        app.state.db = client[settings.mongodb_db_name]
+    except Exception as e:
+        logger.error(f"✗ MongoDB connection failed: {e}")
+        raise
+
+    yield
+
+    # Shutdown
+    app.state.mongo_client.close()
+    logger.info("MongoDB connection closed")
+
+
+app = FastAPI(
+    title="Adaptive HealthOS API",
+    description="Multi-agent personal health operating system",
+    version="1.0.0",
+    lifespan=lifespan
+)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:5173", "http://localhost:3000", "*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+
+@app.get("/health")
+async def health_check():
+    """Health check — verifies MongoDB is reachable."""
+    try:
+        db = app.state.db
+        await db.command("ping")
+        mongo_status = "connected"
+    except Exception as e:
+        mongo_status = f"error: {str(e)}"
+
+    return {
+        "status": "ok",
+        "service": "adaptive-healthos-api",
+        "version": "1.0.0",
+        "mongodb": mongo_status,
+        "gemini_model": settings.gemini_model,
+        "project": settings.google_cloud_project,
+    }
+
+
+@app.get("/")
+async def root():
+    return {"message": "Adaptive HealthOS API", "docs": "/docs"}
+
+
+# Routers added Day 2+
+# from routers import users, logs, chat
+# app.include_router(users.router, prefix="/api/users", tags=["users"])
+# app.include_router(logs.router, prefix="/api/logs", tags=["logs"])
+# app.include_router(chat.router, prefix="/api/chat", tags=["chat"])
