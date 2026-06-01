@@ -5,7 +5,23 @@ Each function here maps to a tool that agents can invoke.
 from datetime import datetime
 from typing import Optional, List, Dict, Any
 from motor.motor_asyncio import AsyncIOMotorClient
+from bson import ObjectId
 from config import get_settings
+
+
+def _serialize(doc: Any) -> Any:
+    """Recursively convert ObjectId and datetime to JSON-safe types."""
+    if doc is None:
+        return None
+    if isinstance(doc, dict):
+        return {k: _serialize(v) for k, v in doc.items() if k != "_id"}
+    if isinstance(doc, list):
+        return [_serialize(i) for i in doc]
+    if isinstance(doc, ObjectId):
+        return str(doc)
+    if isinstance(doc, datetime):
+        return doc.isoformat()
+    return doc
 
 settings = get_settings()
 
@@ -24,7 +40,11 @@ def get_db():
 async def get_user(user_id: str) -> Optional[Dict]:
     """Get full user profile including goals and preferences."""
     db = get_db()
-    return await db.users.find_one({"_id": user_id}, {"_id": 0})
+    try:
+        doc = await db.users.find_one({"_id": ObjectId(user_id)})
+    except Exception:
+        doc = await db.users.find_one({"_id": user_id})
+    return _serialize(doc)
 
 
 async def create_user(user_data: Dict) -> str:
@@ -64,7 +84,8 @@ async def get_recent_logs(user_id: str, log_type: str, limit: int = 7) -> List[D
         sort=[("timestamp", -1)],
         limit=limit
     )
-    return await cursor.to_list(length=limit)
+    docs = await cursor.to_list(length=limit)
+    return _serialize(docs)
 
 
 async def get_daily_nutrition_totals(user_id: str, date_str: str) -> Dict:
@@ -94,10 +115,11 @@ async def get_daily_nutrition_totals(user_id: str, date_str: str) -> Dict:
         }
     ]
     results = await db.health_logs.aggregate(pipeline).to_list(1)
-    return results[0] if results else {
-        "total_calories": 0, "total_protein": 0,
-        "total_carbs": 0, "total_fat": 0, "entry_count": 0
-    }
+    if results:
+        result = results[0]
+        result.pop("_id", None)  # remove _id: null from $group
+        return result
+    return {"total_calories": 0, "total_protein": 0, "total_carbs": 0, "total_fat": 0, "entry_count": 0}
 
 
 # ── PLAN TOOLS ───────────────────────────────────────────────────────────────
@@ -105,10 +127,10 @@ async def get_daily_nutrition_totals(user_id: str, date_str: str) -> Dict:
 async def get_active_plan(user_id: str, plan_type: str) -> Optional[Dict]:
     """Get the current active plan of a given type."""
     db = get_db()
-    return await db.plans.find_one(
-        {"user_id": user_id, "type": plan_type, "is_active": True},
-        {"_id": 0}
+    doc = await db.plans.find_one(
+        {"user_id": user_id, "type": plan_type, "is_active": True}
     )
+    return _serialize(doc)
 
 
 async def create_plan(plan_data: Dict) -> str:
@@ -142,7 +164,8 @@ async def get_recent_agent_decisions(user_id: str, limit: int = 5) -> List[Dict]
         sort=[("timestamp", -1)],
         limit=limit
     )
-    return await cursor.to_list(length=limit)
+    docs = await cursor.to_list(length=limit)
+    return _serialize(docs)
 
 
 # ── GAMIFICATION TOOLS ────────────────────────────────────────────────────────
@@ -150,7 +173,8 @@ async def get_recent_agent_decisions(user_id: str, limit: int = 5) -> List[Dict]
 async def get_gamification_state(user_id: str) -> Optional[Dict]:
     """Get user's XP, level, streak, achievements."""
     db = get_db()
-    return await db.gamification.find_one({"user_id": user_id}, {"_id": 0})
+    doc = await db.gamification.find_one({"user_id": user_id})
+    return _serialize(doc)
 
 
 async def award_xp(user_id: str, xp_amount: int, reason: str) -> Dict:
@@ -224,8 +248,8 @@ async def save_forecast(forecast_data: Dict) -> str:
 async def get_latest_forecast(user_id: str) -> Optional[Dict]:
     """Get the most recent forecast for a user."""
     db = get_db()
-    return await db.forecasts.find_one(
+    doc = await db.forecasts.find_one(
         {"user_id": user_id},
         sort=[("generated_at", -1)],
-        projection={"_id": 0}
     )
+    return _serialize(doc)

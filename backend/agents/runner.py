@@ -57,16 +57,21 @@ async def run_agent(agent, user_id: str, message: str, session_id: Optional[str]
             session_id=session.id,
             new_message=content,
         ):
-            # Capture tool calls for UI display
             if event.content:
                 for part in event.content.parts:
                     if hasattr(part, "function_call") and part.function_call:
                         tools_used.append(part.function_call.name)
                         logger.info(f"{agent.name} calling tool: {part.function_call.name}")
+                    # Capture any text part — keep the last non-empty one
+                    if hasattr(part, "text") and part.text:
+                        response_text = part.text
 
             if event.is_final_response():
+                # Prefer final response text if available
                 if event.content and event.content.parts:
-                    response_text = event.content.parts[0].text or ""
+                    final_text = event.content.parts[0].text or ""
+                    if final_text:
+                        response_text = final_text
                 break
 
     except Exception as e:
@@ -93,6 +98,8 @@ async def run_orchestrator_pipeline(user_id: str, message: str) -> dict:
     from agents.orchestrator import orchestrator_agent
     from agents.nutrition_agent import nutrition_agent
     from agents.workout_agent import workout_agent
+    from agents.recovery_agent import recovery_agent
+    from agents.progress_agent import progress_agent
     from tools.mongodb_tools import (
         insert_health_log, log_agent_decision, award_xp, update_streak, get_recent_logs
     )
@@ -187,19 +194,20 @@ async def run_orchestrator_pipeline(user_id: str, message: str) -> dict:
                 "type": "sleep",
                 "data": {"hours": hours, "quality_score": quality},
             })
-        await log_agent_decision({
-            "user_id": user_id,
-            "agent_name": "RecoveryAgent",
-            "trigger": "sleep_log",
-            "decision": f"Sleep {hours}h logged, quality {quality}/10. Recovery assessed.",
-            "actions_taken": ["insert_health_log", "log_agent_decision"],
-        })
-        await award_xp(user_id, 10, "Sleep logged")
-        specialist_result = {
-            "agent_name": "RecoveryAgent",
-            "response": f"{hours} hours of sleep logged (quality: {quality}/10). RecoveryAgent has updated your recovery status. +10 XP!",
-            "tools_used": ["insert_health_log", "log_agent_decision"],
-        }
+        specialist_msg = (
+            f"Analyze sleep log for user_id={user_id}. "
+            f"Sleep: {hours} hours, quality: {quality}/10. "
+            f"Check recovery status and adjust workout plan if needed. "
+            f"Award 10 XP for logging sleep."
+        )
+        specialist_result = await run_agent(recovery_agent, user_id=user_id, message=specialist_msg)
+
+    elif intent == "PROGRESS_CHECK":
+        specialist_msg = (
+            f"Analyze progress for user_id={user_id}. "
+            f"Review weight history, calculate trend, generate forecast, provide insights."
+        )
+        specialist_result = await run_agent(progress_agent, user_id=user_id, message=specialist_msg)
 
     else:
         specialist_result = {
