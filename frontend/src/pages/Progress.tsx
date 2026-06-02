@@ -35,13 +35,26 @@ export default function Progress({ userId }: Props) {
       if (r.data.weight_history?.length) setWeightData(r.data.weight_history)
     }).catch(() => {})
     getLatestForecast(userId).then(r => {
-      if (r.data) setForecast(r.data)
+      // Only replace forecast if the required fields are present — avoid NaN
+      if (r.data?.current_weight_kg && r.data?.target_weight_kg) setForecast(r.data)
     }).catch(() => {})
   }, [userId])
 
-  const totalLost = DEMO_WEIGHT_DATA[0].weight - DEMO_WEIGHT_DATA[DEMO_WEIGHT_DATA.length - 1].weight
-  const remaining = forecast.current_weight_kg - forecast.target_weight_kg
-  const progressPct = Math.round((totalLost / (DEMO_WEIGHT_DATA[0].weight - forecast.target_weight_kg)) * 100)
+  const startWeight  = weightData[0]?.weight ?? DEMO_WEIGHT_DATA[0].weight
+  const latestWeight = weightData[weightData.length - 1]?.weight ?? DEMO_WEIGHT_DATA[DEMO_WEIGHT_DATA.length - 1].weight
+  const targetWeight = forecast.target_weight_kg ?? DEMO_FORECAST.target_weight_kg
+  const totalLost    = Math.max(0, startWeight - latestWeight)
+  const remaining    = Math.max(0, latestWeight - targetWeight)
+  const progressPct  = Math.min(100, Math.max(0, Math.round((totalLost / Math.max(startWeight - targetWeight, 0.1)) * 100)))
+
+  // Safe date formatter for forecast scenarios
+  const safeDate = (d: any) => {
+    if (!d || Array.isArray(d) || d === '') return 'Calculating...'
+    const parsed = new Date(d)
+    return isNaN(parsed.getTime())
+      ? 'Calculating...'
+      : parsed.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+  }
 
   return (
     <div className="space-y-4">
@@ -71,8 +84,8 @@ export default function Progress({ userId }: Props) {
       {/* Progress bar */}
       <div className="bg-gray-900 border border-gray-800 rounded-xl p-4">
         <div className="flex justify-between text-sm text-gray-400 mb-2">
-          <span>Start: {DEMO_WEIGHT_DATA[0].weight}kg</span>
-          <span>Goal: {forecast.target_weight_kg}kg</span>
+          <span>Start: {startWeight}kg</span>
+          <span>Goal: {targetWeight}kg</span>
         </div>
         <div className="h-3 bg-gray-800 rounded-full overflow-hidden">
           <div className="h-full bg-gradient-to-r from-green-500 to-green-400 rounded-full transition-all"
@@ -119,7 +132,7 @@ export default function Progress({ userId }: Props) {
             <div key={label} className={`flex justify-between items-center ${bg} rounded-lg px-3 py-2.5`}>
               <span className="text-gray-400 text-sm">{label}</span>
               <span className={`font-semibold text-sm ${color}`}>
-                {new Date(date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                {safeDate(date)}
               </span>
             </div>
           ))}

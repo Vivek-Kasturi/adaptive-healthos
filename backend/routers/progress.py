@@ -50,12 +50,29 @@ async def get_progress_summary(user_id: str):
         except Exception as e:
             logger.error(f"ProgressAnalysisAgent error: {e}")
 
+    # Build weight history for chart — oldest first, formatted for Recharts
+    weight_history = []
+    for r in reversed(weights):
+        if "data" in r and "value_kg" in r["data"] and "timestamp" in r:
+            ts = r["timestamp"]
+            try:
+                from datetime import datetime as _dt
+                if isinstance(ts, str):
+                    d = _dt.fromisoformat(ts.replace("Z", "+00:00"))
+                else:
+                    d = ts
+                date_str = d.strftime("%b %-d")
+            except Exception:
+                date_str = str(ts)[:10]
+            weight_history.append({"date": date_str, "weight": r["data"]["value_kg"]})
+
     return {
         "weight_trend_kg": trend_kg,
         "weekly_rate_kg": weekly_rate,
         "weight_entries": len(weight_values),
-        "latest_weight": weight_values[-1] if weight_values else None,
-        "first_weight": weight_values[0] if weight_values else None,
+        "latest_weight": weight_values[0] if weight_values else None,
+        "first_weight": weight_values[-1] if weight_values else None,
+        "weight_history": weight_history,
         "workout_count_30d": len(workouts),
         "food_log_count_30d": len(food_logs),
         "agent_insight": agent_insight,

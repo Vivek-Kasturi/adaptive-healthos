@@ -121,6 +121,34 @@ Then call log_agent_decision.
     }
 
 
+@router.get("/by-email")
+async def get_user_by_email(email: str):
+    """Look up a user by email — used by the login screen."""
+    from tools.mongodb_tools import get_db
+    db = get_db()
+    doc = await db.users.find_one({"email": email})
+    if not doc:
+        raise HTTPException(status_code=404, detail="User not found")
+    from tools.mongodb_tools import _serialize
+    return _serialize(doc)
+
+
+@router.get("/demo-user")
+async def get_demo_user():
+    """Return the most recent demo user — for the 'Try Demo' button."""
+    from tools.mongodb_tools import get_db
+    from tools.mongodb_tools import _serialize
+    db = get_db()
+    # Find most recent user with demo email
+    doc = await db.users.find_one(
+        {"email": {"$regex": "@demo.healthos$"}},
+        sort=[("created_at", -1)]
+    )
+    if not doc:
+        raise HTTPException(status_code=404, detail="No demo user found. Run /api/demo/run first.")
+    return {"user_id": str(doc["_id"]), "name": doc.get("name", "Demo User"), **_serialize(doc)}
+
+
 @router.get("/{user_id}")
 async def get_user_profile(user_id: str):
     user = await get_user(user_id)

@@ -13,9 +13,11 @@ const NAV = [
 interface LayoutProps {
   children: ReactNode
   userId: string
+  userName?: string
+  onLogout?: () => void
 }
 
-export default function Layout({ children, userId }: LayoutProps) {
+export default function Layout({ children, userId, userName, onLogout }: LayoutProps) {
   const { pathname } = useLocation()
 
   return (
@@ -26,6 +28,9 @@ export default function Layout({ children, userId }: LayoutProps) {
           <h1 className="text-green-400 font-bold text-lg leading-tight">Adaptive</h1>
           <h1 className="text-white font-bold text-lg leading-tight">HealthOS</h1>
           <p className="text-gray-500 text-xs mt-1">Multi-Agent System</p>
+          {userName && (
+            <p className="text-gray-400 text-xs mt-2 truncate">👤 {userName}</p>
+          )}
         </div>
 
         <nav className="flex flex-col gap-1 flex-1">
@@ -45,10 +50,18 @@ export default function Layout({ children, userId }: LayoutProps) {
           ))}
         </nav>
 
-        <div className="px-3 pt-4 border-t border-gray-800">
+        <div className="px-3 pt-4 border-t border-gray-800 space-y-2">
           <p className="text-gray-600 text-xs">Powered by</p>
           <p className="text-gray-400 text-xs font-medium">Gemini 2.5 Flash</p>
           <p className="text-gray-400 text-xs">+ MongoDB MCP</p>
+          {onLogout && (
+            <button
+              onClick={onLogout}
+              className="text-gray-600 hover:text-gray-400 text-xs mt-2 transition-colors"
+            >
+              ← Switch account
+            </button>
+          )}
         </div>
       </aside>
 

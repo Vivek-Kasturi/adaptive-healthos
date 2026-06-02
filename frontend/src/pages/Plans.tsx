@@ -66,7 +66,60 @@ export default function Plans({ userId }: Props) {
 
   useEffect(() => {
     getCurrentPlans(userId).then(r => {
-      if (r.data.plans?.length) setPlans(r.data.plans)
+      if (!r.data.plans?.length) return
+      // Merge real plans with demo fallbacks — agents may store data flat (no nested content)
+      const merged = DEMO_PLANS.map(demo => {
+        const real = r.data.plans.find((p: any) => p.type === demo.type)
+        if (!real) return demo
+
+        // Build content: handle nested content OR flat structure
+        let content: any = real.content || {}
+
+        if (demo.type === 'nutrition') {
+          // Ensure macros are nested
+          if (!content.macros) {
+            content = {
+              ...content,
+              macros: {
+                protein_g:  content.protein_g  ?? real.protein_g  ?? (demo.content as any).macros.protein_g,
+                carbs_g:    content.carbs_g    ?? real.carbs_g    ?? (demo.content as any).macros.carbs_g,
+                fat_g:      content.fat_g      ?? real.fat_g      ?? (demo.content as any).macros.fat_g,
+              },
+            }
+          }
+          if (!content.daily_calories)
+            content.daily_calories = real.daily_calories ?? (demo.content as any).daily_calories
+          if (!content.meal_schedule?.length)
+            content.meal_schedule = real.meal_schedule ?? (demo.content as any).meal_schedule
+        }
+
+        if (demo.type === 'workout' && !content.weekly_schedule?.length) {
+          content = {
+            ...content,
+            weekly_schedule: real.weekly_schedule ?? (demo.content as any).weekly_schedule,
+          }
+        }
+
+        if (demo.type === 'recovery') {
+          if (!content.sleep_target_hours)
+            content.sleep_target_hours = real.sleep_target_hours ?? (demo.content as any).sleep_target_hours
+          if (!content.deload_week_every)
+            content.deload_week_every = real.deload_week_every ?? (demo.content as any).deload_week_every
+          if (!content.recovery_tips?.length)
+            content.recovery_tips = real.recovery_tips ?? (demo.content as any).recovery_tips
+        }
+
+        return {
+          ...demo,
+          user_id:           real.user_id           ?? demo.user_id,
+          version:           real.version           ?? demo.version,
+          created_by_agent:  real.created_by_agent  ?? demo.created_by_agent,
+          reason_for_update: real.reason_for_update ?? demo.reason_for_update,
+          created_at:        real.created_at        ?? demo.created_at,
+          content,
+        } as typeof demo
+      })
+      setPlans(merged)
     }).catch(() => {})
   }, [userId])
 

@@ -19,6 +19,12 @@ export const onboardUser = (data: {
 export const getUser = (userId: string) =>
   api.get(`/api/users/${userId}`)
 
+export const getUserByEmail = (email: string) =>
+  api.get(`/api/users/by-email?email=${encodeURIComponent(email)}`)
+
+export const getDemoUser = () =>
+  api.get('/api/users/demo-user')
+
 // ── Logs ───────────────────────────────────────────────────────────────────
 
 export const logFood = (data: object) => api.post('/api/logs/food', data)
