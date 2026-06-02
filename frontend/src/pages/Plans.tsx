@@ -137,7 +137,7 @@ export default function Plans({ userId }: Props) {
       {/* Tabs */}
       <div className="flex gap-2 mb-4">
         {(['nutrition', 'workout', 'recovery'] as const).map(t => (
-          <button key={t} onClick={() => setActiveTab(t)}
+          <button key={t} data-tab={t} onClick={() => setActiveTab(t)}
             className={`px-4 py-2 rounded-lg text-sm font-medium capitalize transition-colors
               ${activeTab === t
                 ? 'bg-green-500/10 text-green-400 border border-green-500/30'

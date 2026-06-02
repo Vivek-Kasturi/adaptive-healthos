@@ -8,7 +8,10 @@ import Progress from './pages/Progress'
 import Achievements from './pages/Achievements'
 import System from './pages/System'
 import Layout from './components/Layout'
+import AutoDemoRunner from './components/AutoDemoRunner'
 import { getUserByEmail, getDemoUser } from './api/client'
+
+const IS_AUTO_DEMO = new URLSearchParams(window.location.search).get('autodemo') === '1'
 
 type Screen = 'login' | 'onboarding' | 'app'
 
@@ -178,11 +181,18 @@ function App() {
     setScreen('login')
   }
 
-  if (screen === 'login') return <LoginScreen onComplete={handleLogin} />
+  if (screen === 'login' && !IS_AUTO_DEMO) return <LoginScreen onComplete={handleLogin} />
   if (screen === 'onboarding') return <Onboarding onComplete={handleOnboarded} />
 
   return (
-    <Layout userId={userId!} userName={userName} onLogout={handleLogout}>
+    <Layout userId={userId || 'demo'} userName={userName} onLogout={handleLogout}>
+      {IS_AUTO_DEMO && (
+        <AutoDemoRunner
+          onLogin={handleLogin}
+          isLoggedIn={screen === 'app'}
+          userId={userId || ''}
+        />
+      )}
       <Routes>
         <Route path="/" element={<Navigate to="/dashboard" replace />} />
         <Route path="/dashboard"    element={<Dashboard    userId={userId!} />} />
