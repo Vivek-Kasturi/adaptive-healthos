@@ -3,11 +3,12 @@ import { ReactNode } from 'react'
 import AgentActivityPanel from './AgentActivity/AgentActivityPanel'
 
 const NAV = [
-  { path: '/dashboard',    label: 'Dashboard',  icon: '🏠' },
-  { path: '/chat',         label: 'Chat',        icon: '💬' },
-  { path: '/plans',        label: 'Plans',       icon: '📋' },
-  { path: '/progress',     label: 'Progress',    icon: '📈' },
-  { path: '/achievements', label: 'Achievements',icon: '🏆' },
+  { path: '/dashboard',    label: 'Dashboard',   icon: '🏠' },
+  { path: '/chat',         label: 'Chat',         icon: '💬' },
+  { path: '/plans',        label: 'Plans',        icon: '📋' },
+  { path: '/progress',     label: 'Progress',     icon: '📈' },
+  { path: '/achievements', label: 'Achievements', icon: '🏆' },
+  { path: '/system',       label: 'For Judges',   icon: '⚙️' },
 ]
 
 interface LayoutProps {

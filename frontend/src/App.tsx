@@ -6,6 +6,7 @@ import Chat from './pages/Chat'
 import Plans from './pages/Plans'
 import Progress from './pages/Progress'
 import Achievements from './pages/Achievements'
+import System from './pages/System'
 import Layout from './components/Layout'
 import { getUserByEmail, getDemoUser } from './api/client'
 
@@ -22,9 +23,9 @@ function LoginScreen({ onComplete }: { onComplete: (id: string, name: string) =>
     setError('')
     try {
       const res = await getDemoUser()
-      onComplete(res.data.user_id, res.data.name || 'Demo User')
+      onComplete(res.data.user_id || String(res.data._id), res.data.name || 'Alex (Demo)')
     } catch {
-      setError('No demo user found. Run the demo first: POST /api/demo/run')
+      setError('No demo user found. Run POST /api/demo/run first.')
     } finally {
       setDemoLoading(false)
     }
@@ -36,13 +37,13 @@ function LoginScreen({ onComplete }: { onComplete: (id: string, name: string) =>
     setError('')
     try {
       const res = await getUserByEmail(email.trim())
-      // Found existing user
-      onComplete(String(res.data._id || res.data.user_id || res.data.id), res.data.name || email)
+      const id = res.data._id || res.data.user_id || res.data.id
+      onComplete(String(id), res.data.name || email)
     } catch (err: any) {
       if (err?.response?.status === 404) {
-        setError('No account found with that email. Create a new account below.')
+        setError('No account found. Create one below.')
       } else {
-        setError('Could not connect to backend. Is it running?')
+        setError('Could not connect to backend.')
       }
     } finally {
       setLoading(false)
@@ -61,26 +62,28 @@ function LoginScreen({ onComplete }: { onComplete: (id: string, name: string) =>
             </h1>
           </div>
           <p className="text-gray-400">Your AI-powered health operating system</p>
-          <div className="flex items-center justify-center gap-2 mt-3">
+          <div className="flex items-center justify-center gap-2 mt-3 flex-wrap">
             <span className="text-xs bg-purple-500/10 border border-purple-500/30 text-purple-400 px-2 py-1 rounded-full">Gemini 2.5 Flash</span>
             <span className="text-xs bg-green-500/10 border border-green-500/30 text-green-400 px-2 py-1 rounded-full">MongoDB Atlas</span>
             <span className="text-xs bg-blue-500/10 border border-blue-500/30 text-blue-400 px-2 py-1 rounded-full">6 AI Agents</span>
+            <span className="text-xs bg-yellow-500/10 border border-yellow-500/30 text-yellow-400 px-2 py-1 rounded-full">Google Cloud ADK</span>
           </div>
         </div>
 
-        {/* Demo button — judges click this */}
+        {/* Demo button */}
         <div className="bg-gradient-to-br from-green-900/30 to-gray-900 border border-green-500/40 rounded-2xl p-5">
           <div className="flex items-start gap-3 mb-4">
             <span className="text-2xl">🎬</span>
             <div>
               <h2 className="text-white font-bold">Try Demo Mode</h2>
-              <p className="text-gray-400 text-sm">See all 6 agents in action with pre-loaded health data</p>
+              <p className="text-gray-400 text-sm">See all 6 agents with pre-loaded health data</p>
             </div>
           </div>
-          <div className="flex gap-2 text-xs text-gray-500 mb-4">
+          <div className="flex gap-2 text-xs text-gray-500 mb-4 flex-wrap">
             <span className="bg-gray-800 px-2 py-1 rounded">225 XP earned</span>
             <span className="bg-gray-800 px-2 py-1 rounded">Full plans ready</span>
             <span className="bg-gray-800 px-2 py-1 rounded">Progress tracked</span>
+            <span className="bg-gray-800 px-2 py-1 rounded">All 6 agents fired</span>
           </div>
           <button
             onClick={handleDemoLogin}
@@ -103,6 +106,7 @@ function LoginScreen({ onComplete }: { onComplete: (id: string, name: string) =>
         {/* Email login */}
         <div className="bg-gray-900 border border-gray-800 rounded-2xl p-5 space-y-3">
           <h3 className="text-white font-semibold">Find my account</h3>
+          <p className="text-gray-500 text-xs">Each user has their own profile, plans, and health data stored in MongoDB Atlas.</p>
           <input
             type="email"
             value={email}
@@ -131,6 +135,12 @@ function LoginScreen({ onComplete }: { onComplete: (id: string, name: string) =>
             Create your account
           </button>
         </p>
+
+        {/* Fine print */}
+        <p className="text-gray-700 text-xs text-center leading-relaxed pt-2">
+          AI-powered by Gemini 2.5 Flash · Claude is AI and can make mistakes — please double-check responses ·
+          Not medical advice · Google Cloud Rapid Agent Hackathon 2026
+        </p>
       </div>
     </div>
   )
@@ -146,10 +156,7 @@ function App() {
   const [screen, setScreen] = useState<Screen>(userId ? 'app' : 'login')
 
   const handleLogin = (id: string, name: string) => {
-    if (id === '__new__') {
-      setScreen('onboarding')
-      return
-    }
+    if (id === '__new__') { setScreen('onboarding'); return }
     localStorage.setItem('healthos_user_id', id)
     localStorage.setItem('healthos_user_name', name)
     setUserId(id)
@@ -178,11 +185,12 @@ function App() {
     <Layout userId={userId!} userName={userName} onLogout={handleLogout}>
       <Routes>
         <Route path="/" element={<Navigate to="/dashboard" replace />} />
-        <Route path="/dashboard" element={<Dashboard userId={userId!} />} />
-        <Route path="/chat" element={<Chat userId={userId!} />} />
-        <Route path="/plans" element={<Plans userId={userId!} />} />
-        <Route path="/progress" element={<Progress userId={userId!} />} />
+        <Route path="/dashboard"    element={<Dashboard    userId={userId!} />} />
+        <Route path="/chat"         element={<Chat         userId={userId!} />} />
+        <Route path="/plans"        element={<Plans        userId={userId!} />} />
+        <Route path="/progress"     element={<Progress     userId={userId!} />} />
         <Route path="/achievements" element={<Achievements userId={userId!} />} />
+        <Route path="/system"       element={<System />} />
       </Routes>
     </Layout>
   )
