@@ -25,6 +25,12 @@ export const getUserByEmail = (email: string) =>
 export const getDemoUser = () =>
   api.get('/api/users/demo-user')
 
+export const loginUser = (email: string, password: string) =>
+  api.post('/api/users/login', { email, password })
+
+export const setPassword = (userId: string, newPassword: string) =>
+  api.post('/api/users/set-password', { user_id: userId, new_password: newPassword })
+
 // ── Logs ───────────────────────────────────────────────────────────────────
 
 export const logFood = (data: object) => api.post('/api/logs/food', data)

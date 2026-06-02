@@ -9,7 +9,7 @@ import Achievements from './pages/Achievements'
 import System from './pages/System'
 import Layout from './components/Layout'
 import AutoDemoRunner from './components/AutoDemoRunner'
-import { getUserByEmail, getDemoUser } from './api/client'
+import { getUserByEmail, getDemoUser, loginUser, setPassword } from './api/client'
 
 const IS_AUTO_DEMO = new URLSearchParams(window.location.search).get('autodemo') === '1'
 
@@ -17,9 +17,12 @@ type Screen = 'login' | 'onboarding' | 'app'
 
 function LoginScreen({ onComplete }: { onComplete: (id: string, name: string) => void }) {
   const [email, setEmail] = useState('')
+  const [password, setPassword] = useState('')
+  const [showPassword, setShowPassword] = useState(false)
   const [loading, setLoading] = useState(false)
   const [demoLoading, setDemoLoading] = useState(false)
   const [error, setError] = useState('')
+  const [needsPassword, setNeedsPassword] = useState(false)
 
   const handleDemoLogin = async () => {
     setDemoLoading(true)
@@ -39,12 +42,30 @@ function LoginScreen({ onComplete }: { onComplete: (id: string, name: string) =>
     setLoading(true)
     setError('')
     try {
-      const res = await getUserByEmail(email.trim())
-      const id = res.data._id || res.data.user_id || res.data.id
-      onComplete(String(id), res.data.name || email)
+      if (password) {
+        // Password login
+        const res = await loginUser(email.trim(), password)
+        onComplete(String(res.data.user_id), res.data.name || email)
+      } else {
+        // Check if account exists first
+        const res = await getUserByEmail(email.trim())
+        const hasPassword = res.data.has_password
+        if (hasPassword) {
+          // Needs password — show password field
+          setNeedsPassword(true)
+          setError('This account has a password. Please enter it below.')
+          setLoading(false)
+          return
+        }
+        // No password set — log in directly
+        const id = res.data._id || res.data.user_id || res.data.id
+        onComplete(String(id), res.data.name || email)
+      }
     } catch (err: any) {
       if (err?.response?.status === 404) {
-        setError('No account found. Create one below.')
+        setError('No account found with that email. Create one below.')
+      } else if (err?.response?.status === 401) {
+        setError('Incorrect password. Try again.')
       } else {
         setError('Could not connect to backend.')
       }
@@ -113,18 +134,38 @@ function LoginScreen({ onComplete }: { onComplete: (id: string, name: string) =>
           <input
             type="email"
             value={email}
-            onChange={e => { setEmail(e.target.value); setError('') }}
-            onKeyDown={e => e.key === 'Enter' && handleEmailLogin()}
+            onChange={e => { setEmail(e.target.value); setError(''); setNeedsPassword(false) }}
+            onKeyDown={e => e.key === 'Enter' && !needsPassword && handleEmailLogin()}
             placeholder="your@email.com"
             className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2.5 text-white placeholder-gray-600 focus:outline-none focus:border-green-500"
           />
-          {error && <p className="text-red-400 text-xs">{error}</p>}
+          {(needsPassword || password) && (
+            <div className="relative">
+              <input
+                type={showPassword ? 'text' : 'password'}
+                value={password}
+                onChange={e => { setPassword(e.target.value); setError('') }}
+                onKeyDown={e => e.key === 'Enter' && handleEmailLogin()}
+                placeholder="Password"
+                autoFocus={needsPassword}
+                className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2.5 text-white placeholder-gray-600 focus:outline-none focus:border-green-500 pr-16"
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword(s => !s)}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 text-xs hover:text-gray-300"
+              >
+                {showPassword ? 'Hide' : 'Show'}
+              </button>
+            </div>
+          )}
+          {error && <p className={`text-xs ${error.includes('password') && !error.includes('Incorrect') ? 'text-yellow-400' : 'text-red-400'}`}>{error}</p>}
           <button
             onClick={handleEmailLogin}
             disabled={loading || !email.trim()}
             className="w-full bg-gray-700 hover:bg-gray-600 disabled:bg-gray-800 disabled:text-gray-600 text-white font-medium py-2.5 rounded-xl transition-colors"
           >
-            {loading ? 'Looking up...' : 'Continue with email →'}
+            {loading ? 'Checking...' : password ? 'Sign in →' : 'Continue with email →'}
           </button>
         </div>
 
@@ -189,7 +230,6 @@ function App() {
       {IS_AUTO_DEMO && (
         <AutoDemoRunner
           onLogin={handleLogin}
-          isLoggedIn={screen === 'app'}
           userId={userId || ''}
         />
       )}

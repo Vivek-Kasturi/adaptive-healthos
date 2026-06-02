@@ -7,6 +7,26 @@ from typing import Optional, List, Dict, Any
 from motor.motor_asyncio import AsyncIOMotorClient
 from bson import ObjectId
 from config import get_settings
+import hashlib
+import hmac
+import os
+
+
+def _hash_password(password: str) -> str:
+    """Simple PBKDF2 password hash (no extra deps needed)."""
+    salt = os.urandom(16).hex()
+    key = hashlib.pbkdf2_hmac('sha256', password.encode(), salt.encode(), 100_000)
+    return f"{salt}:{key.hex()}"
+
+
+def _verify_password(password: str, stored: str) -> bool:
+    """Verify a password against its stored hash."""
+    try:
+        salt, key_hex = stored.split(':', 1)
+        key = hashlib.pbkdf2_hmac('sha256', password.encode(), salt.encode(), 100_000)
+        return hmac.compare_digest(key.hex(), key_hex)
+    except Exception:
+        return False
 
 
 def _serialize(doc: Any) -> Any:

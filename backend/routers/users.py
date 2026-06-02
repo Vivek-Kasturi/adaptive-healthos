@@ -1,13 +1,25 @@
 """
-User routes — onboarding and profile.
+User routes — onboarding, profile, and password-based login.
 """
 from fastapi import APIRouter, HTTPException
+from pydantic import BaseModel
+from typing import Optional
 from models.schemas import OnboardingRequest
-from tools.mongodb_tools import create_user, get_user, award_xp, update_streak
+from tools.mongodb_tools import create_user, get_user, award_xp, update_streak, get_db, _serialize, _hash_password, _verify_password
 import logging
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
+
+
+class LoginRequest(BaseModel):
+    email: str
+    password: str
+
+
+class UpdatePasswordRequest(BaseModel):
+    user_id: str
+    new_password: str
 
 
 @router.post("/onboard")
@@ -30,6 +42,8 @@ async def onboard_user(request: OnboardingRequest):
         "profile": request.profile.model_dump(),
         "goals": request.goals.model_dump(),
     }
+    if request.password:
+        user_data["password_hash"] = _hash_password(request.password)
     user_id = await create_user(user_data)
     logger.info(f"User created: {user_id}")
 
@@ -121,16 +135,51 @@ Then call log_agent_decision.
     }
 
 
+@router.post("/login")
+async def login_user(request: LoginRequest):
+    """Email + password login. Returns user_id on success."""
+    db = get_db()
+    doc = await db.users.find_one({"email": request.email})
+    if not doc:
+        raise HTTPException(status_code=404, detail="No account found with that email.")
+    stored = doc.get("password_hash")
+    if stored and not _verify_password(request.password, stored):
+        raise HTTPException(status_code=401, detail="Incorrect password.")
+    # No password set yet — allow login (backward compat for existing users)
+    return {
+        "user_id": str(doc["_id"]),
+        "name": doc.get("name", ""),
+        "email": doc.get("email", ""),
+        "has_password": bool(stored),
+    }
+
+
+@router.post("/set-password")
+async def set_password(request: UpdatePasswordRequest):
+    """Set or update password for an existing user."""
+    db = get_db()
+    from bson import ObjectId
+    try:
+        filt = {"_id": ObjectId(request.user_id)}
+    except Exception:
+        filt = {"_id": request.user_id}
+    hashed = _hash_password(request.new_password)
+    result = await db.users.update_one(filt, {"$set": {"password_hash": hashed}})
+    if result.matched_count == 0:
+        raise HTTPException(status_code=404, detail="User not found.")
+    return {"ok": True, "message": "Password updated."}
+
+
 @router.get("/by-email")
 async def get_user_by_email(email: str):
     """Look up a user by email — used by the login screen."""
-    from tools.mongodb_tools import get_db
     db = get_db()
     doc = await db.users.find_one({"email": email})
     if not doc:
         raise HTTPException(status_code=404, detail="User not found")
-    from tools.mongodb_tools import _serialize
-    return _serialize(doc)
+    result = _serialize(doc)
+    result["has_password"] = bool(doc.get("password_hash"))
+    return result
 
 
 @router.get("/demo-user")

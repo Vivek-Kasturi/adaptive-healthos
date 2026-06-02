@@ -21,6 +21,7 @@ class UserGoals(BaseModel):
 class OnboardingRequest(BaseModel):
     name: str
     email: str
+    password: Optional[str] = None   # optional — set via /set-password if skipped
     profile: UserProfile
     goals: UserGoals
 

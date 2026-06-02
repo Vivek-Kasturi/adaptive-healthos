@@ -1,17 +1,14 @@
 /**
  * AutoDemoRunner — self-playing demo for screen recording.
  * Activated by ?autodemo=1 in the URL.
- *
- * Shows captions, navigates pages, fires real agents, auto-advances.
- * Total runtime: ~65 seconds of content.
+ * Fix: useRef guard prevents React 18 StrictMode double-run.
  */
-import { useEffect, useState, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { getDemoUser, api } from '../api/client'
 
 interface Props {
   onLogin: (userId: string, name: string) => void
-  isLoggedIn: boolean
   userId: string
 }
 
@@ -20,68 +17,52 @@ interface Step {
   caption: string
   sub: string
   duration: number
-  action?: (userId: string) => Promise<void>
-  click?: string          // querySelector to click
-  scroll?: string         // querySelector to scrollIntoView
-  scrollTop?: boolean     // scroll page to top
+  action?: (uid: string) => Promise<void>
+  click?: string
+  scrollTop?: boolean
 }
 
 const STEPS: Step[] = [
   {
-    route: '/',
+    route: '/dashboard',
     caption: '🧬 Adaptive HealthOS',
-    sub: 'Multi-agent personal health operating system · Google Cloud Rapid Agent Hackathon 2026',
-    duration: 3000,
-  },
-  {
-    route: '/',
-    caption: '▶ Loading Demo Account',
-    sub: 'Pre-populated with 14 days of health data — all 6 agents have already run',
-    duration: 2500,
-    action: async (_userId) => {
-      try {
-        const res = await getDemoUser()
-        const w = window as any
-        w.__demoUserId = res.data.user_id || String(res.data._id)
-        w.__demoUserName = res.data.name || 'Alex (Demo)'
-        w.__demologin?.()
-      } catch {}
-    },
+    sub: 'Multi-agent personal health OS · Google Cloud Rapid Agent Hackathon 2026 · MongoDB Track',
+    duration: 3500,
+    scrollTop: true,
   },
   {
     route: '/dashboard',
-    caption: '🏠 Dashboard — Live Agent Data',
-    sub: 'Alex (Demo) · Level 1 · 225 XP total · 6 AI agents monitoring in real-time',
+    caption: '🏠 Dashboard — Live Agent Data from MongoDB',
+    sub: 'Alex (Demo) · Level 1 · 225 XP · 6 AI agents active · All data persisted in MongoDB Atlas',
     duration: 4000,
     scrollTop: true,
   },
   {
     route: '/dashboard',
-    caption: '📡 Agent Activity Panel',
-    sub: 'Bottom-right: every agent decision stored in MongoDB Atlas as it happens',
+    caption: '📡 Agent Activity Panel — Every Decision Logged',
+    sub: 'Bottom-right panel shows real agent decisions stored in MongoDB Atlas agent_decisions collection',
     duration: 3500,
-    scroll: '.fixed.bottom-4.right-4',
   },
   {
     route: '/chat',
-    caption: '💬 Natural Language Health Logging',
-    sub: 'OrchestratorAgent classifies intent and routes to the right specialist',
-    duration: 2500,
+    caption: '💬 Chat — Natural Language Health Logging',
+    sub: 'OrchestratorAgent classifies intent · Routes to specialist agent · All powered by Gemini 2.5 Flash',
+    duration: 3000,
     scrollTop: true,
   },
   {
     route: '/chat',
-    caption: '😴 Logging: "I only slept 4 hours last night"',
-    sub: 'RecoveryAgent triggered — reading sleep history from MongoDB Atlas...',
-    duration: 4500,
-    action: async (userId) => {
-      // Fire real RecoveryAgent via sleep log endpoint
+    caption: '😴 "I only slept 4 hours last night"',
+    sub: 'RecoveryAgent triggered → reading sleep history from MongoDB → analyzing recovery status...',
+    duration: 4000,
+    action: async (uid) => {
+      if (!uid) return
       try {
         await api.post('/api/logs/sleep', {
-          user_id: userId,
+          user_id: uid,
           hours: 4.0,
           quality_score: 3,
-          notes: 'Auto-demo: poor sleep log'
+          notes: 'Demo: poor sleep'
         })
       } catch {}
     },
@@ -94,167 +75,166 @@ const STEPS: Step[] = [
   },
   {
     route: '/plans',
-    caption: '📋 Nutrition Plan — NutritionAgent v2',
-    sub: '1,800 kcal · 140g protein · 180g carbs · Generated from your body metrics by Gemini 2.5 Flash',
+    caption: '📋 Plans — AI-Generated & Auto-Updated',
+    sub: 'Nutrition Plan v2 · Created by NutritionAgent from your profile · Saved to MongoDB Atlas plans collection',
     duration: 3500,
     scrollTop: true,
   },
   {
     route: '/plans',
     caption: '💪 Workout Plan — WorkoutAgent',
-    sub: 'Auto-adapted based on consistency tracking and current recovery status',
+    sub: 'Weekly schedule auto-adapted based on consistency and recovery status from MongoDB data',
     duration: 2500,
     click: 'button[data-tab="workout"]',
   },
   {
     route: '/plans',
     caption: '😴 Recovery Plan — RecoveryAgent',
-    sub: 'Sleep targets updated · Workout intensity reduced 40% after 4-hour sleep log',
+    sub: 'Sleep targets updated · Workout intensity reduced 40% after 4-hour sleep · Saved to MongoDB',
     duration: 2500,
     click: 'button[data-tab="recovery"]',
   },
   {
     route: '/progress',
-    caption: '📈 Weight History — Real MongoDB Data',
-    sub: '-1.3kg trend over 12 days · May 20 → June 1 · Updated after every weight log',
+    caption: '📈 Progress — Real Weight Data from MongoDB',
+    sub: '-1.3kg trend over 12 days · May 20 → June 1 · Chart updates after every weight log entry',
     duration: 3500,
     scrollTop: true,
   },
   {
     route: '/progress',
     caption: '🔮 Goal Forecast — ForecastingAgent',
-    sub: '3 scenarios: Optimistic · Realistic · Pessimistic · Regenerated after each weight entry',
-    duration: 3000,
+    sub: '3 scenarios: Optimistic · Realistic · Pessimistic · Auto-regenerated by Gemini after each log',
+    duration: 3500,
   },
   {
     route: '/achievements',
     caption: '🏆 Gamification — 225 XP Earned',
-    sub: 'XP awarded by agents for every health action · Level progression · Streak tracking',
+    sub: 'XP awarded by agents for every health action · Streak tracking · Level progression',
     duration: 3500,
     scrollTop: true,
   },
   {
     route: '/system',
-    caption: '⚙️ For Judges — Hackathon Criteria',
-    sub: 'Technological Implementation · Design · Potential Impact · Quality of Idea — all 4 criteria met',
-    duration: 4500,
+    caption: '⚙️ For Judges — All 4 Criteria Met',
+    sub: 'Technological Implementation · Design · Potential Impact · Quality of Idea — 100pts potential',
+    duration: 5000,
     scrollTop: true,
   },
   {
     route: '/system',
     caption: '🤖 6-Agent Architecture on Google Cloud ADK',
     sub: 'Each agent: classifies → plans → calls MongoDB tools → stores decision → returns response',
-    duration: 3500,
+    duration: 4000,
   },
   {
     route: '/system',
-    caption: '🍃 MongoDB Atlas — Agent Memory Layer',
+    caption: '🍃 MongoDB Atlas — The Agent Memory Layer',
     sub: '6 collections · Every agent decision persisted · Full audit trail · Scales to millions of users',
     duration: 3500,
   },
   {
     route: '/dashboard',
     caption: '✅ Adaptive HealthOS — Demo Complete',
-    sub: 'github.com/Vivek-Kasturi/adaptive-healthos · Built June 2026 · Google Cloud ADK + Gemini 2.5 Flash + MongoDB Atlas',
+    sub: 'github.com/Vivek-Kasturi/adaptive-healthos · Gemini 2.5 Flash + Google Cloud ADK + MongoDB Atlas',
     duration: 4000,
     scrollTop: true,
   },
 ]
 
-export default function AutoDemoRunner({ onLogin, isLoggedIn, userId }: Props) {
+export default function AutoDemoRunner({ onLogin, userId }: Props) {
   const navigate = useNavigate()
-  const [stepIdx, setStepIdx] = useState(-1)
-  const [caption, setCaption] = useState('')
-  const [sub, setSub] = useState('')
+  const navigateRef = useRef(navigate)
+  const ranRef = useRef(false)        // prevents StrictMode double-run
+  const userIdRef = useRef(userId)
+  const [stepIdx, setStepIdx] = useState(0)
+  const [caption, setCaption] = useState(STEPS[0].caption)
+  const [sub, setSub] = useState(STEPS[0].sub)
   const [progress, setProgress] = useState(0)
   const [done, setDone] = useState(false)
-  const loggedInRef = useRef(isLoggedIn)
-  const userIdRef = useRef(userId)
 
-  useEffect(() => { loggedInRef.current = isLoggedIn }, [isLoggedIn])
+  // Keep refs in sync without triggering re-run
+  useEffect(() => { navigateRef.current = navigate }, [navigate])
   useEffect(() => { userIdRef.current = userId }, [userId])
 
-  // Expose login trigger so action callbacks can call it
+  // Expose login bridge for async action callback
   useEffect(() => {
     const w = window as any
-    w.__demologin = () => {
-      const id = w.__demoUserId
-      const name = w.__demoUserName
-      if (id) onLogin(id, name)
-    }
+    w.__demologin = (id: string, name: string) => onLogin(id, name)
     return () => { delete w.__demologin }
   }, [onLogin])
 
+  // Main demo loop — runs exactly once
   useEffect(() => {
-    let cancelled = false
+    if (ranRef.current) return
+    ranRef.current = true
 
     const run = async () => {
-      await new Promise(r => setTimeout(r, 800)) // brief pause before starting
+      // Auto-login with demo user first
+      try {
+        const res = await getDemoUser()
+        const id = res.data.user_id || String(res.data._id)
+        const name = res.data.name || 'Alex (Demo)'
+        ;(window as any).__demologin?.(id, name)
+        // Wait for React to update userId via onLogin
+        await new Promise(r => setTimeout(r, 1200))
+      } catch {}
 
       for (let i = 0; i < STEPS.length; i++) {
-        if (cancelled) return
         const step = STEPS[i]
-
         setStepIdx(i)
         setCaption(step.caption)
         setSub(step.sub)
         setProgress(Math.round(((i + 1) / STEPS.length) * 100))
 
-        navigate(step.route)
-        await new Promise(r => setTimeout(r, 300))
+        navigateRef.current(step.route)
+        await new Promise(r => setTimeout(r, 400))
 
         if (step.scrollTop) window.scrollTo({ top: 0, behavior: 'smooth' })
 
         if (step.action) {
           await step.action(userIdRef.current).catch(() => {})
+          await new Promise(r => setTimeout(r, 500))
         }
 
         if (step.click) {
           await new Promise(r => setTimeout(r, 600))
-          const el = document.querySelector(step.click) as HTMLButtonElement
-          el?.click()
-        }
-
-        if (step.scroll) {
-          await new Promise(r => setTimeout(r, 700))
-          document.querySelector(step.scroll)?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+          ;(document.querySelector(step.click) as HTMLButtonElement)?.click()
         }
 
         await new Promise(r => setTimeout(r, step.duration))
       }
 
-      if (!cancelled) setDone(true)
+      setDone(true)
     }
 
     run()
-    return () => { cancelled = true }
-  }, [navigate])
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   if (done) return null
 
   return (
     <>
-      {/* Green progress bar at very top */}
-      <div className="fixed top-0 left-0 right-0 z-[200] h-1 bg-gray-900">
+      {/* Top progress bar */}
+      <div className="fixed top-0 left-0 right-0 z-[200] h-1.5 bg-gray-900">
         <div
           className="h-full bg-green-400 transition-all duration-700 ease-out"
           style={{ width: `${progress}%` }}
         />
       </div>
 
-      {/* Recording badge */}
-      <div className="fixed top-3 right-20 z-[200] flex items-center gap-1.5 bg-black/80 backdrop-blur border border-red-500/40 rounded-full px-3 py-1.5">
+      {/* REC badge */}
+      <div className="fixed top-3 right-20 z-[200] flex items-center gap-1.5 bg-black/85 backdrop-blur border border-red-500/50 rounded-full px-3 py-1.5">
         <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
-        <span className="text-white text-xs font-bold tracking-wide">REC</span>
+        <span className="text-white text-xs font-bold tracking-wider">REC</span>
         <span className="text-gray-500 text-xs ml-1">{stepIdx + 1}/{STEPS.length}</span>
       </div>
 
       {/* Bottom caption bar */}
-      <div className="fixed bottom-0 left-0 right-0 z-[200] bg-gray-950/97 backdrop-blur-sm border-t border-gray-800">
+      <div className="fixed bottom-0 left-0 right-0 z-[200] bg-gray-950/98 backdrop-blur border-t border-gray-800">
         <div className="px-6 py-4 max-w-5xl mx-auto">
           <p className="text-white font-bold text-xl leading-snug">{caption}</p>
           <p className="text-gray-400 text-sm mt-1 leading-relaxed">{sub}</p>
-
           <div className="flex items-center gap-3 mt-3">
             <div className="flex-1 h-0.5 bg-gray-800 rounded-full overflow-hidden">
               <div
@@ -262,14 +242,9 @@ export default function AutoDemoRunner({ onLogin, isLoggedIn, userId }: Props) {
                 style={{ width: `${progress}%` }}
               />
             </div>
-            <div className="flex items-center gap-2 shrink-0">
-              <span className="text-xs bg-green-500/10 border border-green-500/20 text-green-400 px-2 py-0.5 rounded-full">
-                Adaptive HealthOS
-              </span>
-              <span className="text-gray-600 text-xs">
-                {stepIdx + 1} / {STEPS.length}
-              </span>
-            </div>
+            <span className="text-xs bg-green-500/10 border border-green-500/20 text-green-400 px-2 py-0.5 rounded-full shrink-0">
+              {stepIdx + 1} / {STEPS.length}
+            </span>
           </div>
         </div>
       </div>
