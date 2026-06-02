@@ -225,6 +225,14 @@ function App() {
   if (screen === 'login' && !IS_AUTO_DEMO) return <LoginScreen onComplete={handleLogin} />
   if (screen === 'onboarding') return <Onboarding onComplete={handleOnboarded} />
 
+  // In auto-demo mode while still on login screen, show login briefly
+  if (IS_AUTO_DEMO && screen === 'login') return (
+    <>
+      <LoginScreen onComplete={handleLogin} />
+      <AutoDemoRunner onLogin={handleLogin} userId={userId || ''} />
+    </>
+  )
+
   return (
     <Layout userId={userId || 'demo'} userName={userName} onLogout={handleLogout}>
       {IS_AUTO_DEMO && (

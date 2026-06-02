@@ -38,9 +38,10 @@ def init_vertexai():
     if not _initialized:
         _setup_credentials()
         settings = get_settings()
+        location = getattr(settings, 'google_cloud_location', None) or getattr(settings, 'google_cloud_region', 'us-central1')
         vertexai.init(
             project=settings.google_cloud_project,
-            location=settings.google_cloud_location
+            location=location
         )
         _initialized = True
         logger.info(f"Vertex AI initialized — project={settings.google_cloud_project} model={settings.gemini_model}")

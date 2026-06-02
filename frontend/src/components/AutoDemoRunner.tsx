@@ -170,14 +170,23 @@ export default function AutoDemoRunner({ onLogin, userId }: Props) {
     ranRef.current = true
 
     const run = async () => {
-      // Auto-login with demo user first
+      // Step 0: Show login page briefly before auto-logging in
+      setStepIdx(0)
+      setCaption('🔐 Login — One-click Demo Access')
+      setSub('Each user has their own profile, plans, and health data stored in MongoDB Atlas')
+      setProgress(0)
+      navigateRef.current('/')
+      await new Promise(r => setTimeout(r, 3000))
+
+      // Auto-login with demo user
+      setCaption('▶ Loading Demo Account...')
+      setSub('Pre-populated with 14 days of health data — all 6 agents have already run')
       try {
         const res = await getDemoUser()
         const id = res.data.user_id || String(res.data._id)
         const name = res.data.name || 'Alex (Demo)'
         ;(window as any).__demologin?.(id, name)
-        // Wait for React to update userId via onLogin
-        await new Promise(r => setTimeout(r, 1200))
+        await new Promise(r => setTimeout(r, 1500))
       } catch {}
 
       for (let i = 0; i < STEPS.length; i++) {
