@@ -8,6 +8,10 @@ import logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+# Suppress noisy-but-harmless ADK / OpenTelemetry async-cleanup errors
+logging.getLogger("opentelemetry.context").setLevel(logging.CRITICAL)
+logging.getLogger("opentelemetry").setLevel(logging.ERROR)
+
 settings = get_settings()
 
 

@@ -12,16 +12,25 @@ interface Message {
 }
 
 const AGENT_COLORS: Record<string, string> = {
-  OrchestratorAgent:    'text-purple-400',
-  NutritionAgent:       'text-green-400',
-  WorkoutAgent:         'text-blue-400',
-  RecoveryAgent:        'text-yellow-400',
-  ProgressAnalysisAgent:'text-pink-400',
-  ForecastingAgent:     'text-cyan-400',
-  AccountabilityAgent:  'text-orange-400',
+  OrchestratorAgent:    'text-purple-600',
+  NutritionAgent:       'text-emerald-600',
+  WorkoutAgent:         'text-blue-600',
+  RecoveryAgent:        'text-amber-600',
+  ProgressAnalysisAgent:'text-pink-600',
+  ForecastingAgent:     'text-cyan-600',
+  AccountabilityAgent:  'text-orange-600',
 }
 
-// Which MongoDB tools each agent calls — for visual display
+const AGENT_BG: Record<string, string> = {
+  OrchestratorAgent:    'bg-purple-50 border-purple-100',
+  NutritionAgent:       'bg-emerald-50 border-emerald-100',
+  WorkoutAgent:         'bg-blue-50 border-blue-100',
+  RecoveryAgent:        'bg-amber-50 border-amber-100',
+  ProgressAnalysisAgent:'bg-pink-50 border-pink-100',
+  ForecastingAgent:     'bg-cyan-50 border-cyan-100',
+  AccountabilityAgent:  'bg-orange-50 border-orange-100',
+}
+
 const AGENT_TOOLS: Record<string, string[]> = {
   NutritionAgent:       ['get_active_plan()', 'get_daily_nutrition_totals()', 'create_plan()', 'log_agent_decision()', 'award_xp()'],
   WorkoutAgent:         ['get_active_plan()', 'get_recent_logs()', 'create_plan()', 'log_agent_decision()', 'award_xp()'],
@@ -62,13 +71,7 @@ export default function Chat({ userId }: Props) {
   const addToolsMessage = (agent: string) => {
     const tools = AGENT_TOOLS[agent] || []
     if (!tools.length) return
-    setMessages(m => [...m, {
-      role: 'tools',
-      text: '',
-      agent,
-      tools,
-      timestamp: new Date(),
-    }])
+    setMessages(m => [...m, { role: 'tools', text: '', agent, tools, timestamp: new Date() }])
   }
 
   const send = (text: string) => {
@@ -81,33 +84,23 @@ export default function Chat({ userId }: Props) {
     try {
       if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) {
         wsRef.current = createChatSocket(userId)
-
         wsRef.current.onmessage = (e) => {
           const data = JSON.parse(e.data)
           const agent = data.agent_name || 'OrchestratorAgent'
           setThinkingAgent(`${agent} calling MongoDB tools...`)
           setTimeout(() => {
             addToolsMessage(agent)
-            setMessages(m => [...m, {
-              role: 'agent',
-              text: data.response,
-              agent,
-              tools: data.tools_used || [],
-              timestamp: new Date(),
-            }])
+            setMessages(m => [...m, { role: 'agent', text: data.response, agent, tools: data.tools_used || [], timestamp: new Date() }])
             setThinking(false)
           }, 400)
         }
-
         wsRef.current.onerror = () => demoBotResponse(text)
         wsRef.current.onclose = () => { wsRef.current = null }
+        wsRef.current.onopen = () => {
+          wsRef.current?.send(JSON.stringify({ user_id: userId, message: text }))
+        }
       } else {
         wsRef.current.send(JSON.stringify({ user_id: userId, message: text }))
-        return
-      }
-
-      wsRef.current.onopen = () => {
-        wsRef.current?.send(JSON.stringify({ user_id: userId, message: text }))
       }
     } catch {
       demoBotResponse(text)
@@ -117,8 +110,7 @@ export default function Chat({ userId }: Props) {
   const demoBotResponse = (userText: string) => {
     const lower = userText.toLowerCase()
     let response = '', agent = 'OrchestratorAgent'
-
-    if (lower.includes('egg') || lower.includes('food') || lower.includes('ate') || lower.includes('breakfast') || lower.includes('lunch') || lower.includes('dinner') || lower.includes('ate')) {
+    if (lower.includes('egg') || lower.includes('food') || lower.includes('ate') || lower.includes('breakfast') || lower.includes('lunch') || lower.includes('dinner')) {
       response = "✓ Food logged! NutritionAgent analyzed your entry — you've consumed ~420 kcal toward your 1,800 kcal daily target. Protein on track at 24g. Plan saved to MongoDB Atlas. +10 XP awarded."
       agent = 'NutritionAgent'
     } else if (lower.includes('run') || lower.includes('workout') || lower.includes('gym') || lower.includes('exercise') || lower.includes('min')) {
@@ -137,7 +129,6 @@ export default function Chat({ userId }: Props) {
       response = "OrchestratorAgent classified your intent and routed to the appropriate specialist. Try: 'I had oatmeal for breakfast', 'I did a 30min run', 'log my weight as 80kg', or 'I only slept 4 hours'."
       agent = 'OrchestratorAgent'
     }
-
     setTimeout(() => {
       setThinkingAgent(`${agent} calling MongoDB tools...`)
       setTimeout(() => {
@@ -149,11 +140,15 @@ export default function Chat({ userId }: Props) {
   }
 
   return (
-    <div className="flex flex-col h-[calc(100vh-7rem)]">
+    <div className="flex flex-col h-[calc(100vh-10rem)]">
+      {/* Header */}
       <div className="flex items-center justify-between mb-4">
-        <h2 className="text-xl font-bold text-white">Chat with HealthOS</h2>
-        <div className="flex items-center gap-2 text-xs text-gray-500">
-          <span className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse" />
+        <div>
+          <h2 className="text-xl font-bold text-slate-900">Chat with HealthOS</h2>
+          <p className="text-slate-500 text-xs mt-0.5">AI agents respond to your health logs in real-time</p>
+        </div>
+        <div className="flex items-center gap-2 text-xs text-slate-500 bg-white border border-slate-200 rounded-full px-3 py-1.5 shadow-sm">
+          <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
           6 agents ready
         </div>
       </div>
@@ -164,13 +159,13 @@ export default function Chat({ userId }: Props) {
           <div key={i}>
             {m.role === 'tools' && (
               <div className="flex justify-start ml-1">
-                <div className="bg-gray-900 border border-gray-800 rounded-lg px-3 py-2 max-w-[85%]">
-                  <p className="text-gray-600 text-xs mb-1.5">
-                    🔧 <span className={AGENT_COLORS[m.agent!] || 'text-gray-400'}>{m.agent}</span> → MongoDB Atlas
+                <div className={`border rounded-xl px-3 py-2 max-w-[85%] ${AGENT_BG[m.agent!] || 'bg-slate-50 border-slate-200'}`}>
+                  <p className="text-slate-500 text-xs mb-1.5 font-medium">
+                    🔧 <span className={AGENT_COLORS[m.agent!] || 'text-slate-600'}>{m.agent}</span> → MongoDB Atlas
                   </p>
                   <div className="flex flex-wrap gap-1">
                     {(m.tools || []).map((t, j) => (
-                      <span key={j} className="text-xs font-mono bg-gray-800 text-green-500 px-1.5 py-0.5 rounded border border-green-900">
+                      <span key={j} className="text-xs font-mono bg-white text-emerald-700 px-1.5 py-0.5 rounded border border-emerald-200 shadow-sm">
                         {t}
                       </span>
                     ))}
@@ -181,20 +176,20 @@ export default function Chat({ userId }: Props) {
 
             {m.role !== 'tools' && (
               <div className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                <div className={`max-w-[80%]`}>
+                <div className="max-w-[80%]">
                   {m.role === 'agent' && m.agent && (
-                    <p className={`text-xs font-medium mb-1 ml-1 ${AGENT_COLORS[m.agent] || 'text-green-400'}`}>
+                    <p className={`text-xs font-semibold mb-1 ml-1 ${AGENT_COLORS[m.agent] || 'text-emerald-600'}`}>
                       {m.agent}
                     </p>
                   )}
                   <div className={`rounded-2xl px-4 py-3 text-sm leading-relaxed
                     ${m.role === 'user'
-                      ? 'bg-green-500 text-black rounded-tr-sm'
-                      : 'bg-gray-800 text-gray-200 rounded-tl-sm border border-gray-700'
+                      ? 'bg-emerald-600 text-white rounded-tr-sm shadow-sm'
+                      : 'bg-white text-slate-800 rounded-tl-sm border border-slate-200 shadow-sm'
                     }`}>
                     {m.text}
                   </div>
-                  <p className="text-gray-600 text-xs mt-1 mx-1">
+                  <p className="text-slate-400 text-xs mt-1 mx-1">
                     {m.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                   </p>
                 </div>
@@ -205,11 +200,11 @@ export default function Chat({ userId }: Props) {
 
         {thinking && (
           <div className="flex justify-start">
-            <div className="bg-gray-800 border border-gray-700 rounded-2xl rounded-tl-sm px-4 py-3">
+            <div className="bg-white border border-slate-200 rounded-2xl rounded-tl-sm px-4 py-3 shadow-sm">
               <div className="flex gap-1.5 items-center">
-                <span className="text-xs text-green-400 mr-2">{thinkingAgent}</span>
+                <span className="text-xs text-emerald-600 font-medium mr-2">{thinkingAgent}</span>
                 {[0,1,2].map(i => (
-                  <div key={i} className="w-1.5 h-1.5 bg-green-400 rounded-full animate-bounce"
+                  <div key={i} className="w-1.5 h-1.5 bg-emerald-400 rounded-full animate-bounce"
                     style={{ animationDelay: `${i * 0.15}s` }} />
                 ))}
               </div>
@@ -223,7 +218,7 @@ export default function Chat({ userId }: Props) {
       <div className="flex gap-2 overflow-x-auto py-2 scrollbar-thin">
         {QUICK_PROMPTS.map(p => (
           <button key={p} onClick={() => send(p)}
-            className="shrink-0 text-xs bg-gray-800 hover:bg-gray-700 border border-gray-700 text-gray-300 px-3 py-1.5 rounded-full transition-colors">
+            className="shrink-0 text-xs bg-white hover:bg-emerald-50 border border-slate-200 hover:border-emerald-300 text-slate-600 hover:text-emerald-700 px-3 py-1.5 rounded-full transition-all shadow-sm">
             {p}
           </button>
         ))}
@@ -232,22 +227,18 @@ export default function Chat({ userId }: Props) {
       {/* Input */}
       <div className="flex gap-2 mt-2">
         <input
+          id="chat-input"
           value={input}
           onChange={e => setInput(e.target.value)}
           onKeyDown={e => e.key === 'Enter' && send(input)}
           placeholder="Log food, workout, weight... or ask anything"
-          className="flex-1 bg-gray-800 border border-gray-700 rounded-xl px-4 py-3 text-white text-sm focus:outline-none focus:border-green-500 placeholder-gray-600"
+          className="flex-1 bg-white border border-slate-300 rounded-xl px-4 py-3 text-slate-900 text-sm focus:outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100 placeholder-slate-400 shadow-sm"
         />
-        <button onClick={() => send(input)} disabled={!input.trim() || thinking}
-          className="bg-green-500 hover:bg-green-400 disabled:bg-gray-700 text-black font-bold px-4 rounded-xl transition-colors">
+        <button id="chat-send" onClick={() => send(input)} disabled={!input.trim() || thinking}
+          className="bg-emerald-600 hover:bg-emerald-700 disabled:bg-slate-200 disabled:text-slate-400 text-white font-bold px-5 rounded-xl transition-colors shadow-sm">
           →
         </button>
       </div>
-
-      {/* Fine print */}
-      <p className="text-gray-700 text-xs text-center mt-2 leading-relaxed">
-        Powered by Gemini 2.5 Flash · AI can make mistakes — please double-check responses · Not medical advice
-      </p>
     </div>
   )
 }

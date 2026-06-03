@@ -73,3 +73,22 @@ export const createChatSocket = (userId: string): WebSocket => {
   const wsUrl = (BASE_URL.replace('http', 'ws'))
   return new WebSocket(`${wsUrl}/ws/chat/${userId}`)
 }
+
+// ── Demo Profiles ──────────────────────────────────────────────────────────
+
+export const getDemoProfiles = () =>
+  api.get('/api/users/demo-profiles')
+
+export const seedDemoProfiles = () =>
+  api.post('/api/demo/seed-profiles')
+
+// ── Nutrition today ────────────────────────────────────────────────────────
+
+export const getTodaysFoodLogs = (userId: string) =>
+  api.get(`/api/logs/food/today?user_id=${userId}`)
+
+export const getRecentSleepLogs = (userId: string) =>
+  api.get(`/api/logs/sleep/recent?user_id=${userId}`)
+
+export const getRecentWorkoutLogs = (userId: string) =>
+  api.get(`/api/logs/workout/recent?user_id=${userId}`)

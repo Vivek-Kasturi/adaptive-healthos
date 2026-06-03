@@ -198,9 +198,31 @@ async def get_demo_user():
     return {"user_id": str(doc["_id"]), "name": doc.get("name", "Demo User"), **_serialize(doc)}
 
 
+
+
+@router.get("/demo-profiles")
+async def get_demo_profiles():
+    """Return all 3 seeded demo profiles for the multi-profile demo."""
+    from tools.mongodb_tools import get_db, _serialize
+    db = get_db()
+    profiles = []
+    for email in ["alex@demo.healthos", "maya@demo.healthos", "sam@demo.healthos"]:
+        doc = await db.users.find_one({"email": email}, sort=[("created_at", -1)])
+        if doc:
+            profiles.append({
+                "user_id": str(doc["_id"]),
+                "name": doc.get("name", "Demo User"),
+                "email": email,
+                **_serialize(doc),
+            })
+    if not profiles:
+        raise HTTPException(status_code=404, detail="Demo profiles not seeded. Run POST /api/demo/seed-profiles first.")
+    return {"profiles": profiles}
+
 @router.get("/{user_id}")
 async def get_user_profile(user_id: str):
     user = await get_user(user_id)
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
     return user
+

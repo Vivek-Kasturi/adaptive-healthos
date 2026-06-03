@@ -178,3 +178,35 @@ async def log_sleep(request: SleepLogRequest):
         "agent_response": result["response"],
         "tools_used": result["tools_used"],
     }
+
+
+@router.get("/food/today")
+async def get_todays_food(user_id: str):
+    """Return today's food logs for the nutrition day-view."""
+    from tools.mongodb_tools import get_db, _serialize
+    from datetime import date
+    db = get_db()
+    today = date.today().isoformat()
+    cursor = db.health_logs.find({
+        "user_id": user_id,
+        "type": "food",
+        "logged_at": {"$regex": f"^{today}"}
+    }).sort("logged_at", 1)
+    docs = await cursor.to_list(length=20)
+    return {"logs": [_serialize(d) for d in docs]}
+
+
+@router.get("/sleep/recent")
+async def get_recent_sleep(user_id: str):
+    """Return last 7 sleep logs."""
+    from tools.mongodb_tools import get_recent_logs
+    logs = await get_recent_logs(user_id, "sleep", limit=7)
+    return {"logs": logs}
+
+
+@router.get("/workout/recent")
+async def get_recent_workouts(user_id: str):
+    """Return last 7 workout logs."""
+    from tools.mongodb_tools import get_recent_logs
+    logs = await get_recent_logs(user_id, "workout", limit=7)
+    return {"logs": logs}

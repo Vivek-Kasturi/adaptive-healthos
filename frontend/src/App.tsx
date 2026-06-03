@@ -9,7 +9,7 @@ import Achievements from './pages/Achievements'
 import System from './pages/System'
 import Layout from './components/Layout'
 import AutoDemoRunner from './components/AutoDemoRunner'
-import { getUserByEmail, getDemoUser, loginUser, setPassword } from './api/client'
+import { getUserByEmail, getDemoUser, loginUser } from './api/client'
 
 const IS_AUTO_DEMO = new URLSearchParams(window.location.search).get('autodemo') === '1'
 
@@ -43,101 +43,95 @@ function LoginScreen({ onComplete }: { onComplete: (id: string, name: string) =>
     setError('')
     try {
       if (password) {
-        // Password login
         const res = await loginUser(email.trim(), password)
         onComplete(String(res.data.user_id), res.data.name || email)
       } else {
-        // Check if account exists first
         const res = await getUserByEmail(email.trim())
-        const hasPassword = res.data.has_password
-        if (hasPassword) {
-          // Needs password — show password field
+        if (res.data.has_password) {
           setNeedsPassword(true)
           setError('This account has a password. Please enter it below.')
           setLoading(false)
           return
         }
-        // No password set — log in directly
         const id = res.data._id || res.data.user_id || res.data.id
         onComplete(String(id), res.data.name || email)
       }
     } catch (err: any) {
-      if (err?.response?.status === 404) {
-        setError('No account found with that email. Create one below.')
-      } else if (err?.response?.status === 401) {
-        setError('Incorrect password. Try again.')
-      } else {
-        setError('Could not connect to backend.')
-      }
+      if (err?.response?.status === 404) setError('No account found with that email.')
+      else if (err?.response?.status === 401) setError('Incorrect password. Try again.')
+      else setError('Could not connect to backend.')
     } finally {
       setLoading(false)
     }
   }
 
   return (
-    <div className="min-h-screen bg-gray-950 flex items-center justify-center p-4">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-emerald-50 flex items-center justify-center p-4">
       <div className="w-full max-w-md space-y-4">
         {/* Header */}
         <div className="text-center mb-8">
-          <div className="flex items-center justify-center gap-2 mb-3">
-            <span className="text-3xl">🧬</span>
-            <h1 className="text-3xl font-bold text-white">
-              Adaptive <span className="text-green-400">HealthOS</span>
-            </h1>
+          <div className="flex items-center justify-center gap-3 mb-3">
+            <span className="text-4xl">🧬</span>
+            <div>
+              <h1 className="text-3xl font-black text-slate-900 leading-none">
+                Adaptive <span className="text-emerald-600">HealthOS</span>
+              </h1>
+            </div>
           </div>
-          <p className="text-gray-400">Your AI-powered health operating system</p>
+          <p className="text-slate-500 text-sm">Your AI-powered personal health operating system</p>
           <div className="flex items-center justify-center gap-2 mt-3 flex-wrap">
-            <span className="text-xs bg-purple-500/10 border border-purple-500/30 text-purple-400 px-2 py-1 rounded-full">Gemini 2.5 Flash</span>
-            <span className="text-xs bg-green-500/10 border border-green-500/30 text-green-400 px-2 py-1 rounded-full">MongoDB Atlas</span>
-            <span className="text-xs bg-blue-500/10 border border-blue-500/30 text-blue-400 px-2 py-1 rounded-full">6 AI Agents</span>
-            <span className="text-xs bg-yellow-500/10 border border-yellow-500/30 text-yellow-400 px-2 py-1 rounded-full">Google Cloud ADK</span>
+            <span className="text-xs bg-purple-100 border border-purple-200 text-purple-700 px-2.5 py-1 rounded-full font-medium">Gemini 2.5 Flash</span>
+            <span className="text-xs bg-emerald-100 border border-emerald-200 text-emerald-700 px-2.5 py-1 rounded-full font-medium">MongoDB Atlas</span>
+            <span className="text-xs bg-blue-100 border border-blue-200 text-blue-700 px-2.5 py-1 rounded-full font-medium">6 AI Agents</span>
+            <span className="text-xs bg-amber-100 border border-amber-200 text-amber-700 px-2.5 py-1 rounded-full font-medium">Google Cloud ADK</span>
           </div>
         </div>
 
         {/* Demo button */}
-        <div className="bg-gradient-to-br from-green-900/30 to-gray-900 border border-green-500/40 rounded-2xl p-5">
+        <div id="demo-section" className="bg-gradient-to-br from-emerald-50 to-white border border-emerald-200 rounded-2xl p-5 shadow-sm">
           <div className="flex items-start gap-3 mb-4">
             <span className="text-2xl">🎬</span>
             <div>
-              <h2 className="text-white font-bold">Try Demo Mode</h2>
-              <p className="text-gray-400 text-sm">See all 6 agents with pre-loaded health data</p>
+              <h2 className="text-slate-900 font-bold">Try Demo Mode</h2>
+              <p className="text-slate-500 text-sm">See all 6 agents with 14 days of pre-loaded health data</p>
             </div>
           </div>
-          <div className="flex gap-2 text-xs text-gray-500 mb-4 flex-wrap">
-            <span className="bg-gray-800 px-2 py-1 rounded">225 XP earned</span>
-            <span className="bg-gray-800 px-2 py-1 rounded">Full plans ready</span>
-            <span className="bg-gray-800 px-2 py-1 rounded">Progress tracked</span>
-            <span className="bg-gray-800 px-2 py-1 rounded">All 6 agents fired</span>
+          <div className="flex gap-2 text-xs text-slate-500 mb-4 flex-wrap">
+            <span className="bg-white border border-slate-200 px-2 py-1 rounded-lg shadow-sm">225 XP earned</span>
+            <span className="bg-white border border-slate-200 px-2 py-1 rounded-lg shadow-sm">Full plans ready</span>
+            <span className="bg-white border border-slate-200 px-2 py-1 rounded-lg shadow-sm">Progress tracked</span>
+            <span className="bg-white border border-slate-200 px-2 py-1 rounded-lg shadow-sm">All 6 agents fired</span>
           </div>
           <button
+            id="demo-login-btn"
             onClick={handleDemoLogin}
             disabled={demoLoading}
-            className="w-full bg-green-500 hover:bg-green-400 disabled:bg-gray-700 disabled:text-gray-500 text-black font-bold py-3 rounded-xl transition-colors flex items-center justify-center gap-2"
+            className="w-full bg-emerald-600 hover:bg-emerald-700 disabled:bg-slate-200 disabled:text-slate-400 text-white font-bold py-3 rounded-xl transition-colors flex items-center justify-center gap-2 shadow-sm"
           >
             {demoLoading
-              ? <><span className="w-4 h-4 border-2 border-black border-t-transparent rounded-full animate-spin" /> Loading demo...</>
+              ? <><span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> Loading demo...</>
               : '▶ Load Demo Account'
             }
           </button>
         </div>
 
         <div className="flex items-center gap-3">
-          <div className="flex-1 h-px bg-gray-800" />
-          <span className="text-gray-600 text-xs">or use your account</span>
-          <div className="flex-1 h-px bg-gray-800" />
+          <div className="flex-1 h-px bg-slate-200" />
+          <span className="text-slate-400 text-xs">or use your account</span>
+          <div className="flex-1 h-px bg-slate-200" />
         </div>
 
         {/* Email login */}
-        <div className="bg-gray-900 border border-gray-800 rounded-2xl p-5 space-y-3">
-          <h3 className="text-white font-semibold">Find my account</h3>
-          <p className="text-gray-500 text-xs">Each user has their own profile, plans, and health data stored in MongoDB Atlas.</p>
+        <div className="bg-white border border-slate-200 rounded-2xl p-5 space-y-3 shadow-sm">
+          <h3 className="text-slate-800 font-semibold">Sign in</h3>
+          <p className="text-slate-400 text-xs">Each user has their own profile and health data stored in MongoDB Atlas.</p>
           <input
             type="email"
             value={email}
             onChange={e => { setEmail(e.target.value); setError(''); setNeedsPassword(false) }}
             onKeyDown={e => e.key === 'Enter' && !needsPassword && handleEmailLogin()}
             placeholder="your@email.com"
-            className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2.5 text-white placeholder-gray-600 focus:outline-none focus:border-green-500"
+            className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2.5 text-slate-900 placeholder-slate-400 focus:outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100 text-sm"
           />
           {(needsPassword || password) && (
             <div className="relative">
@@ -148,42 +142,32 @@ function LoginScreen({ onComplete }: { onComplete: (id: string, name: string) =>
                 onKeyDown={e => e.key === 'Enter' && handleEmailLogin()}
                 placeholder="Password"
                 autoFocus={needsPassword}
-                className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2.5 text-white placeholder-gray-600 focus:outline-none focus:border-green-500 pr-16"
+                className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2.5 text-slate-900 placeholder-slate-400 focus:outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100 text-sm pr-16"
               />
-              <button
-                type="button"
-                onClick={() => setShowPassword(s => !s)}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 text-xs hover:text-gray-300"
-              >
+              <button type="button" onClick={() => setShowPassword(s => !s)}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs hover:text-slate-600">
                 {showPassword ? 'Hide' : 'Show'}
               </button>
             </div>
           )}
-          {error && <p className={`text-xs ${error.includes('password') && !error.includes('Incorrect') ? 'text-yellow-400' : 'text-red-400'}`}>{error}</p>}
-          <button
-            onClick={handleEmailLogin}
-            disabled={loading || !email.trim()}
-            className="w-full bg-gray-700 hover:bg-gray-600 disabled:bg-gray-800 disabled:text-gray-600 text-white font-medium py-2.5 rounded-xl transition-colors"
-          >
-            {loading ? 'Checking...' : password ? 'Sign in →' : 'Continue with email →'}
+          {error && <p className={`text-xs ${error.includes('password') && !error.includes('Incorrect') ? 'text-amber-600' : 'text-red-500'}`}>{error}</p>}
+          <button onClick={handleEmailLogin} disabled={loading || !email.trim()}
+            className="w-full bg-slate-800 hover:bg-slate-900 disabled:bg-slate-100 disabled:text-slate-400 text-white font-medium py-2.5 rounded-xl transition-colors text-sm">
+            {loading ? 'Checking...' : password ? 'Sign in →' : 'Continue →'}
           </button>
         </div>
 
         {/* New user */}
-        <p className="text-center text-gray-600 text-sm">
+        <p className="text-center text-slate-500 text-sm">
           New user?{' '}
-          <button
-            onClick={() => onComplete('__new__', '')}
-            className="text-green-400 hover:text-green-300 underline"
-          >
+          <button onClick={() => onComplete('__new__', '')} className="text-emerald-600 hover:text-emerald-700 underline font-medium">
             Create your account
           </button>
         </p>
 
         {/* Fine print */}
-        <p className="text-gray-700 text-xs text-center leading-relaxed pt-2">
-          AI-powered by Gemini 2.5 Flash · Claude is AI and can make mistakes — please double-check responses ·
-          Not medical advice · Google Cloud Rapid Agent Hackathon 2026
+        <p className="text-slate-400 text-xs text-center leading-relaxed pt-1">
+          ⚠️ AI-powered by Gemini 2.5 Flash · Can make mistakes — please double-check responses · Not medical advice
         </p>
       </div>
     </div>
@@ -191,11 +175,16 @@ function LoginScreen({ onComplete }: { onComplete: (id: string, name: string) =>
 }
 
 function App() {
+  // Auto-demo always starts fresh — clears any stale session from previous runs
+  if (IS_AUTO_DEMO) {
+    localStorage.removeItem('healthos_user_id')
+    localStorage.removeItem('healthos_user_name')
+  }
   const [userId, setUserId] = useState<string | null>(
-    localStorage.getItem('healthos_user_id')
+    IS_AUTO_DEMO ? null : localStorage.getItem('healthos_user_id')
   )
   const [userName, setUserName] = useState<string>(
-    localStorage.getItem('healthos_user_name') || ''
+    IS_AUTO_DEMO ? '' : (localStorage.getItem('healthos_user_name') || '')
   )
   const [screen, setScreen] = useState<Screen>(userId ? 'app' : 'login')
 
@@ -222,25 +211,40 @@ function App() {
     setScreen('login')
   }
 
-  if (screen === 'login' && !IS_AUTO_DEMO) return <LoginScreen onComplete={handleLogin} />
-  if (screen === 'onboarding') return <Onboarding onComplete={handleOnboarded} />
+  // ── Auto-demo: keep AutoDemoRunner mounted through ALL screen transitions ──
+  // Without this, navigating login→onboarding unmounts the runner mid-flow.
+  if (IS_AUTO_DEMO) {
+    const appRoutes = (
+      <Routes>
+        <Route path="/" element={<Navigate to="/dashboard" replace />} />
+        <Route path="/dashboard"    element={<Dashboard    userId={userId || 'demo'} />} />
+        <Route path="/chat"         element={<Chat         userId={userId || 'demo'} />} />
+        <Route path="/plans"        element={<Plans        userId={userId || 'demo'} />} />
+        <Route path="/progress"     element={<Progress     userId={userId || 'demo'} />} />
+        <Route path="/achievements" element={<Achievements userId={userId || 'demo'} />} />
+        <Route path="/system"       element={<System />} />
+      </Routes>
+    )
+    return (
+      <>
+        {/* Always mounted — survives login/onboarding/app transitions */}
+        <AutoDemoRunner onLogin={handleLogin} userId={userId || ''} />
+        {screen === 'login'      && <LoginScreen onComplete={handleLogin} />}
+        {screen === 'onboarding' && <Onboarding  onComplete={handleOnboarded} />}
+        {screen === 'app'        && (
+          <Layout userId={userId || 'demo'} userName={userName} onLogout={handleLogout}>
+            {appRoutes}
+          </Layout>
+        )}
+      </>
+    )
+  }
 
-  // In auto-demo mode while still on login screen, show login briefly
-  if (IS_AUTO_DEMO && screen === 'login') return (
-    <>
-      <LoginScreen onComplete={handleLogin} />
-      <AutoDemoRunner onLogin={handleLogin} userId={userId || ''} />
-    </>
-  )
+  if (screen === 'login')      return <LoginScreen onComplete={handleLogin} />
+  if (screen === 'onboarding') return <Onboarding  onComplete={handleOnboarded} />
 
   return (
     <Layout userId={userId || 'demo'} userName={userName} onLogout={handleLogout}>
-      {IS_AUTO_DEMO && (
-        <AutoDemoRunner
-          onLogin={handleLogin}
-          userId={userId || ''}
-        />
-      )}
       <Routes>
         <Route path="/" element={<Navigate to="/dashboard" replace />} />
         <Route path="/dashboard"    element={<Dashboard    userId={userId!} />} />

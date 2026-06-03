@@ -154,25 +154,80 @@ async def get_active_plan(user_id: str, plan_type: str) -> Optional[Dict]:
 
 
 async def create_plan(plan_data: Dict) -> str:
-    """Create a new plan. Deactivates previous plans of same type."""
+    """Create or update an AI-generated plan for a user.
+
+    Required fields in plan_data:
+      - user_id (str): the user this plan belongs to
+      - type (str): one of "nutrition", "workout", or "recovery"
+      - created_by_agent (str): name of the calling agent
+      - reason_for_update (str): why the plan is being created/updated
+      - content (dict): plan details (macros, schedule, tips, etc.)
+
+    Returns the inserted document ID as a string, or an error string.
+    """
+    # Defensive field extraction — never crash on missing keys
+    user_id   = plan_data.get("user_id") or plan_data.get("userId", "")
+    plan_type = (
+        plan_data.get("type")
+        or plan_data.get("plan_type")
+        or plan_data.get("planType")
+        or "general"
+    )
+    if not user_id:
+        return "Error: plan_data must include user_id."
+
     db = get_db()
+    # Deactivate all previous plans of same type for this user
     await db.plans.update_many(
-        {"user_id": plan_data["user_id"], "type": plan_data["type"]},
+        {"user_id": user_id, "type": plan_type},
         {"$set": {"is_active": False}}
     )
-    plan_data["created_at"] = datetime.utcnow()
-    plan_data["is_active"] = True
-    result = await db.plans.insert_one(plan_data)
+
+    plan_doc = {
+        "user_id":           user_id,
+        "type":              plan_type,
+        "created_by_agent":  plan_data.get("created_by_agent", "Agent"),
+        "reason_for_update": plan_data.get("reason_for_update", "Agent update"),
+        "content":           plan_data.get("content") or {k: v for k, v in plan_data.items()
+                                                           if k not in ("user_id", "type", "created_by_agent",
+                                                                        "reason_for_update", "content",
+                                                                        "plan_type", "userId", "planType")},
+        "created_at":        datetime.utcnow(),
+        "is_active":         True,
+    }
+    result = await db.plans.insert_one(plan_doc)
     return str(result.inserted_id)
 
 
 # ── AGENT DECISION TOOLS ──────────────────────────────────────────────────────
 
 async def log_agent_decision(decision_data: Dict) -> str:
-    """Record an agent decision for audit trail and UI display."""
+    """Record an agent decision for audit trail and the Agent Activity Panel.
+
+    Required fields in decision_data:
+      - user_id (str): the user this decision belongs to
+      - agent_name (str): name of the agent making the decision
+      - trigger (str): what triggered this, e.g. "sleep_log", "food_log"
+      - decision (str): 1-2 sentence summary of what was decided
+      - actions_taken (list): list of action strings
+
+    Returns the inserted document ID as a string.
+    """
+    doc = {
+        "user_id":       decision_data.get("user_id", ""),
+        "agent_name":    decision_data.get("agent_name", "Agent"),
+        "trigger":       decision_data.get("trigger", "unknown"),
+        "decision":      decision_data.get("decision", ""),
+        "actions_taken": decision_data.get("actions_taken", []),
+        "timestamp":     __import__("datetime").datetime.utcnow(),
+    }
+    # Merge any extra context fields
+    extra = {k: v for k, v in decision_data.items()
+             if k not in ("user_id", "agent_name", "trigger", "decision", "actions_taken")}
+    doc.update(extra)
+
     db = get_db()
-    decision_data["timestamp"] = datetime.utcnow()
-    result = await db.agent_decisions.insert_one(decision_data)
+    result = await db.agent_decisions.insert_one(doc)
     return str(result.inserted_id)
 
 
@@ -256,11 +311,17 @@ async def update_streak(user_id: str) -> Dict:
 
 # ── FORECAST TOOLS ────────────────────────────────────────────────────────────
 
-async def save_forecast(forecast_data: Dict) -> str:
-    """Save a new forecast, replacing the previous one."""
+async def save_forecast(forecast_data: Dict, user_id: str = "") -> str:
+    """Save a new forecast, replacing the previous one.
+    Accepts user_id as either a top-level param or inside forecast_data dict.
+    """
     db = get_db()
     forecast_data["generated_at"] = datetime.utcnow()
-    await db.forecasts.delete_many({"user_id": forecast_data["user_id"]})
+    # Resolve user_id: explicit param → dict key → skip delete
+    uid = user_id or forecast_data.get("user_id", "")
+    if uid:
+        forecast_data["user_id"] = uid
+        await db.forecasts.delete_many({"user_id": uid})
     result = await db.forecasts.insert_one(forecast_data)
     return str(result.inserted_id)
 

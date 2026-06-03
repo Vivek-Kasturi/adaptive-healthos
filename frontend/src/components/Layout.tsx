@@ -22,43 +22,50 @@ export default function Layout({ children, userId, userName, onLogout }: LayoutP
   const { pathname } = useLocation()
 
   return (
-    <div className="min-h-screen bg-gray-950 flex">
+    <div className="min-h-screen bg-slate-50 flex">
       {/* Sidebar */}
-      <aside className="w-56 bg-gray-900 border-r border-gray-800 flex flex-col py-6 px-3 fixed h-full">
+      <aside className="w-56 bg-white border-r border-slate-200 flex flex-col py-6 px-3 fixed h-full shadow-sm">
         <div className="mb-8 px-3">
-          <h1 className="text-green-400 font-bold text-lg leading-tight">Adaptive</h1>
-          <h1 className="text-white font-bold text-lg leading-tight">HealthOS</h1>
-          <p className="text-gray-500 text-xs mt-1">Multi-Agent System</p>
+          <div className="flex items-center gap-2 mb-1">
+            <span className="text-xl">🧬</span>
+            <div>
+              <span className="text-emerald-600 font-bold text-base">Adaptive </span>
+              <span className="text-slate-800 font-bold text-base">HealthOS</span>
+            </div>
+          </div>
+          <p className="text-slate-400 text-xs mt-0.5 pl-7">Multi-Agent System</p>
           {userName && (
-            <p className="text-gray-400 text-xs mt-2 truncate">👤 {userName}</p>
+            <div className="mt-3 bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1.5">
+              <p className="text-slate-600 text-xs truncate">👤 {userName}</p>
+            </div>
           )}
         </div>
 
-        <nav className="flex flex-col gap-1 flex-1">
+        <nav className="flex flex-col gap-0.5 flex-1">
           {NAV.map(({ path, label, icon }) => (
             <Link
               key={path}
               to={path}
-              className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors
+              className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all
                 ${pathname === path
-                  ? 'bg-green-500/10 text-green-400 border border-green-500/20'
-                  : 'text-gray-400 hover:text-white hover:bg-gray-800'
+                  ? 'bg-emerald-50 text-emerald-700 border border-emerald-200 shadow-sm'
+                  : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
                 }`}
             >
-              <span>{icon}</span>
+              <span className="text-base">{icon}</span>
               {label}
             </Link>
           ))}
         </nav>
 
-        <div className="px-3 pt-4 border-t border-gray-800 space-y-2">
-          <p className="text-gray-600 text-xs">Powered by</p>
-          <p className="text-gray-400 text-xs font-medium">Gemini 2.5 Flash</p>
-          <p className="text-gray-400 text-xs">+ MongoDB MCP</p>
+        <div className="px-3 pt-4 border-t border-slate-200 space-y-1">
+          <p className="text-slate-400 text-xs">Powered by</p>
+          <p className="text-slate-700 text-xs font-semibold">Gemini 2.5 Flash</p>
+          <p className="text-slate-500 text-xs">+ MongoDB Atlas MCP</p>
           {onLogout && (
             <button
               onClick={onLogout}
-              className="text-gray-600 hover:text-gray-400 text-xs mt-2 transition-colors"
+              className="text-slate-400 hover:text-slate-600 text-xs mt-2 transition-colors block"
             >
               ← Switch account
             </button>
@@ -67,10 +74,17 @@ export default function Layout({ children, userId, userName, onLogout }: LayoutP
       </aside>
 
       {/* Main content */}
-      <main className="ml-56 flex-1 min-h-screen">
-        <div className="p-6 pb-32">
+      <main className="ml-56 flex-1 min-h-screen flex flex-col">
+        <div className="flex-1 p-6 pb-4">
           {children}
         </div>
+
+        {/* Fine print footer — visible on every page */}
+        <footer className="px-6 py-3 border-t border-slate-200 bg-white">
+          <p className="text-slate-400 text-xs text-center leading-relaxed">
+            ⚠️ Adaptive HealthOS uses AI and can make mistakes. Please double-check all responses. This is not medical advice. · Google Cloud Rapid Agent Hackathon 2026
+          </p>
+        </footer>
       </main>
 
       {/* Agent Activity Panel — always visible bottom-right */}

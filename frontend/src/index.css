@@ -4,13 +4,13 @@
 
 @layer base {
   body {
-    @apply bg-gray-950 text-white;
+    @apply bg-slate-50 text-slate-900;
   }
 }
 
 @layer utilities {
   .scrollbar-thin {
     scrollbar-width: thin;
-    scrollbar-color: #374151 transparent;
+    scrollbar-color: #cbd5e1 transparent;
   }
 }
