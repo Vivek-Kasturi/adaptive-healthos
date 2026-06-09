@@ -63,6 +63,25 @@ NutritionAgent  WorkoutAgent  RecoveryAgent  ProgressAgent  ForecastingAgent
 
 ---
 
+## MongoDB MCP Server
+
+`backend/mcp_server.py` is a Python MCP Server built with the official [`mcp`](https://pypi.org/project/mcp/) SDK. It exposes all MongoDB Atlas operations as Model Context Protocol tools:
+
+| MCP Tool | Operation |
+|---|---|
+| `get_user_profile` | Fetch user profile and goals |
+| `get_active_plan` | Read nutrition / workout / recovery plan |
+| `create_plan` | Write new agent-generated plan |
+| `insert_health_log` | Persist food, workout, weight, sleep entries |
+| `get_daily_nutrition_totals` | Aggregate today's macros |
+| `log_agent_decision` | Record agent reasoning to `agent_decisions` collection |
+| `award_xp` / `update_streak` | Update gamification state |
+| `get_latest_forecast` | Read goal projection |
+
+Run the MCP server standalone: `python backend/mcp_server.py`
+
+---
+
 ## Tech Stack
 
 | Layer | Technology |
