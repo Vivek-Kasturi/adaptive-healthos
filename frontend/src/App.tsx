@@ -7,8 +7,10 @@ import Plans from './pages/Plans'
 import Progress from './pages/Progress'
 import Achievements from './pages/Achievements'
 import System from './pages/System'
+import NotFound from './pages/NotFound'
 import Layout from './components/Layout'
 import AutoDemoRunner from './components/AutoDemoRunner'
+import { ErrorBoundary } from './components/ErrorBoundary'
 import { getUserByEmail, getDemoUser, loginUser } from './api/client'
 
 const IS_AUTO_DEMO = new URLSearchParams(window.location.search).get('autodemo') === '1'
@@ -223,38 +225,44 @@ function App() {
         <Route path="/progress"     element={<Progress     userId={userId || 'demo'} />} />
         <Route path="/achievements" element={<Achievements userId={userId || 'demo'} />} />
         <Route path="/system"       element={<System />} />
+        <Route path="*"             element={<NotFound />} />
       </Routes>
     )
     return (
-      <>
-        {/* Always mounted — survives login/onboarding/app transitions */}
-        <AutoDemoRunner onLogin={handleLogin} userId={userId || ''} />
-        {screen === 'login'      && <LoginScreen onComplete={handleLogin} />}
-        {screen === 'onboarding' && <Onboarding  onComplete={handleOnboarded} />}
-        {screen === 'app'        && (
-          <Layout userId={userId || 'demo'} userName={userName} onLogout={handleLogout}>
-            {appRoutes}
-          </Layout>
-        )}
-      </>
+      <ErrorBoundary>
+        <>
+          {/* Always mounted — survives login/onboarding/app transitions */}
+          <AutoDemoRunner onLogin={handleLogin} userId={userId || ''} />
+          {screen === 'login'      && <LoginScreen onComplete={handleLogin} />}
+          {screen === 'onboarding' && <Onboarding  onComplete={handleOnboarded} />}
+          {screen === 'app'        && (
+            <Layout userId={userId || 'demo'} userName={userName} onLogout={handleLogout}>
+              {appRoutes}
+            </Layout>
+          )}
+        </>
+      </ErrorBoundary>
     )
   }
 
-  if (screen === 'login')      return <LoginScreen onComplete={handleLogin} />
-  if (screen === 'onboarding') return <Onboarding  onComplete={handleOnboarded} />
+  if (screen === 'login')      return <ErrorBoundary><LoginScreen onComplete={handleLogin} /></ErrorBoundary>
+  if (screen === 'onboarding') return <ErrorBoundary><Onboarding  onComplete={handleOnboarded} /></ErrorBoundary>
 
   return (
-    <Layout userId={userId || 'demo'} userName={userName} onLogout={handleLogout}>
-      <Routes>
-        <Route path="/" element={<Navigate to="/dashboard" replace />} />
-        <Route path="/dashboard"    element={<Dashboard    userId={userId!} />} />
-        <Route path="/chat"         element={<Chat         userId={userId!} />} />
-        <Route path="/plans"        element={<Plans        userId={userId!} />} />
-        <Route path="/progress"     element={<Progress     userId={userId!} />} />
-        <Route path="/achievements" element={<Achievements userId={userId!} />} />
-        <Route path="/system"       element={<System />} />
-      </Routes>
-    </Layout>
+    <ErrorBoundary>
+      <Layout userId={userId || 'demo'} userName={userName} onLogout={handleLogout}>
+        <Routes>
+          <Route path="/" element={<Navigate to="/dashboard" replace />} />
+          <Route path="/dashboard"    element={<Dashboard    userId={userId!} />} />
+          <Route path="/chat"         element={<Chat         userId={userId!} />} />
+          <Route path="/plans"        element={<Plans        userId={userId!} />} />
+          <Route path="/progress"     element={<Progress     userId={userId!} />} />
+          <Route path="/achievements" element={<Achievements userId={userId!} />} />
+          <Route path="/system"       element={<System />} />
+          <Route path="*"             element={<NotFound />} />
+        </Routes>
+      </Layout>
+    </ErrorBoundary>
   )
 }
 

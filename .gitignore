@@ -21,7 +21,6 @@ application_default_credentials.json
 .env
 .env.local
 .env.*.local
-vercel.json
 
 # IDE
 .vscode/

@@ -1,21 +1,37 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import { getUser, getGamificationState, logWeight } from '../api/client'
 import { User, GamificationState } from '../types'
+import { DashboardSkeleton, ErrorState } from '../components/Skeleton'
 
 interface Props { userId: string }
+
+type AsyncStatus = 'loading' | 'error' | 'success'
 
 export default function Dashboard({ userId }: Props) {
   const [user, setUser] = useState<User | null>(null)
   const [game, setGame] = useState<GamificationState | null>(null)
+  const [status, setStatus] = useState<AsyncStatus>('loading')
   const [showWeightModal, setShowWeightModal] = useState(false)
   const [weight, setWeight] = useState('')
   const [logging, setLogging] = useState<string | null>(null)
   const today = new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })
 
-  useEffect(() => {
-    getUser(userId).then(r => setUser(r.data)).catch(() => {})
-    getGamificationState(userId).then(r => setGame(r.data)).catch(() => {})
+  const load = useCallback(async () => {
+    setStatus('loading')
+    try {
+      const [userRes, gameRes] = await Promise.all([
+        getUser(userId),
+        getGamificationState(userId),
+      ])
+      setUser(userRes.data)
+      setGame(gameRes.data)
+      setStatus('success')
+    } catch {
+      setStatus('error')
+    }
   }, [userId])
+
+  useEffect(() => { load() }, [load])
 
   const handleLogWeight = async () => {
     if (!weight) return
@@ -32,6 +48,9 @@ export default function Dashboard({ userId }: Props) {
 
   const xpToNextLevel = game ? (((game.level) * 250) - game.xp_total) : 250
   const xpProgress = game ? ((game.xp_total % 250) / 250) * 100 : 0
+
+  if (status === 'loading') return <DashboardSkeleton />
+  if (status === 'error')   return <ErrorState message="Could not load your dashboard. Check your connection." onRetry={load} />
 
   return (
     <div>

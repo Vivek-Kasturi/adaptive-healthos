@@ -1,8 +1,11 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import { getGamificationState } from '../api/client'
 import { GamificationState } from '../types'
+import { AchievementsSkeleton, ErrorState } from '../components/Skeleton'
 
 interface Props { userId: string }
+
+type AsyncStatus = 'loading' | 'error' | 'success'
 
 const ALL_ACHIEVEMENTS = [
   { id: 'first_log',          name: 'First Step',      desc: 'Log your first health entry',    icon: '👣', xp: 50   },
@@ -26,9 +29,12 @@ const DEMO_STATE: GamificationState = {
 
 export default function Achievements({ userId }: Props) {
   const [game, setGame] = useState<GamificationState>(DEMO_STATE)
+  const [status, setStatus] = useState<AsyncStatus>('loading')
 
-  useEffect(() => {
-    getGamificationState(userId).then(r => {
+  const load = useCallback(async () => {
+    setStatus('loading')
+    try {
+      const r = await getGamificationState(userId)
       if (r.data) setGame({
         xp_total: r.data.xp_total ?? 0,
         level: r.data.level ?? 1,
@@ -37,8 +43,13 @@ export default function Achievements({ userId }: Props) {
         weekly_xp: r.data.weekly_xp ?? 0,
         achievements: Array.isArray(r.data.achievements) ? r.data.achievements : [],
       })
-    }).catch(() => {})
+      setStatus('success')
+    } catch {
+      setStatus('error')
+    }
   }, [userId])
+
+  useEffect(() => { load() }, [load])
 
   const achievements  = Array.isArray(game.achievements) ? game.achievements : []
   const xpTotal       = game.xp_total ?? 0
@@ -46,6 +57,9 @@ export default function Achievements({ userId }: Props) {
   const unlockedIds   = new Set(achievements.map((a: any) => String(a.id || a)))
   const xpToNext      = Math.max(0, level * 250 - xpTotal)
   const xpProgress    = ((xpTotal % 250) / 250) * 100
+
+  if (status === 'loading') return <AchievementsSkeleton />
+  if (status === 'error')   return <ErrorState message="Could not load achievements. Using demo data." onRetry={load} />
 
   return (
     <div className="space-y-4">

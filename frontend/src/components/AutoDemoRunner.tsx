@@ -4,6 +4,10 @@
  *
  * Onboarding is shown as a self-contained visual overlay (no dependency on
  * the real Onboarding component state), so typing is always visible.
+ *
+ * TTS voiceover: each step calls /api/demo/tts on the backend, which runs
+ * macOS `say` — perfectly synced because the browser triggers it.
+ * Pass ?voice=Samantha&rate=165 in the URL to control voice/speed.
  */
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
@@ -15,6 +19,30 @@ interface Props {
 }
 
 const wait = (ms: number) => new Promise<void>(r => setTimeout(r, ms))
+
+// ── TTS: fires macOS say via backend — perfectly synced with browser steps ──
+const DEMO_VOICE = new URLSearchParams(window.location.search).get('voice') ?? 'Samantha'
+const DEMO_RATE  = parseInt(new URLSearchParams(window.location.search).get('rate') ?? '165', 10)
+
+async function speak(text: string) {
+  try {
+    await fetch('/api/demo/tts', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text, voice: DEMO_VOICE, rate: DEMO_RATE }),
+    })
+  } catch { /* non-fatal — TTS is optional */ }
+}
+
+// ── Timeout wrapper — prevents any API call from hanging the demo ──────────
+async function timed<T>(promise: Promise<T>, ms = 8000): Promise<T | undefined> {
+  try {
+    return await Promise.race([
+      promise,
+      wait(ms).then(() => { throw new Error('demo-timeout') }),
+    ])
+  } catch { return undefined }
+}
 
 // ── DOM helpers ────────────────────────────────────────────────────────────
 function getCenter(sel: string) {
@@ -362,7 +390,8 @@ export default function AutoDemoRunner({ onLogin, userId }: Props) {
       // Generating plans
       step(5, '🤖 AI Agents Generating Your Plans...', 'NutritionAgent · WorkoutAgent · RecoveryAgent — all running on Google Cloud ADK + Gemini 2.5 Flash')
       setObStep(4)
-      await wait(4000)
+      speak("OrchestratorAgent fires NutritionAgent and WorkoutAgent simultaneously. Gemini 2.5 Flash generates your personalized meal and workout plans, saved directly to MongoDB Atlas.")
+      await wait(10000)
       setObStep(0)
 
       // ── 2. Load Alex demo ────────────────────────────────────────────────
@@ -377,16 +406,17 @@ export default function AutoDemoRunner({ onLogin, userId }: Props) {
       }
       navRef.current('/dashboard')
       await wait(700); window.scrollTo({ top: 0 })
-      // Spotlight agent status section
+      speak("Meet Alex Chen — 14 days of real health data. Level 2, 340 XP, a 7-day streak, and all 6 agents live, connected to MongoDB Atlas.")
       await wait(1800)
       spot('.bg-white.border.border-slate-200.rounded-xl.p-4.shadow-sm', 2500)
-      await wait(3500)
+      await wait(7000)
 
       // Agent panel
       step(7, '📡 Agent Activity Panel — Every Decision Logged', 'Live panel shows real agent decisions → stored in MongoDB Atlas agent_decisions collection')
       await moveTo('.fixed.bottom-4.right-4', 800)
       spot('.fixed.bottom-4.right-4', 3000)
-      await wait(3500)
+      speak("The Agent Activity Panel logs every agent decision to MongoDB — tool calls, reasoning, and actions. Fully auditable.")
+      await wait(9000)
 
       // ── 3. Chat — food log ───────────────────────────────────────────────
       navRef.current('/chat')
@@ -396,11 +426,12 @@ export default function AutoDemoRunner({ onLogin, userId }: Props) {
       spot('#chat-input', 6000)
       await typeInto('#chat-input', 'I had oatmeal with 2 boiled eggs for breakfast', 62)
       await wait(600)
-      try { await api.post('/api/logs/food', { user_id: uidRef.current, name: 'Oatmeal + 2 boiled eggs', calories: 520, protein_g: 28, carbs_g: 58, fat_g: 14, meal_type: 'breakfast' }) } catch {}
+      await timed(api.post('/api/logs/food', { user_id: uidRef.current, name: 'Oatmeal + 2 boiled eggs', calories: 520, protein_g: 28, carbs_g: 58, fat_g: 14, meal_type: 'breakfast' }))
       await cursorClick('#chat-send')
       step(9, '🥗 NutritionAgent → MongoDB Tool Calls', 'get_active_plan() · get_daily_nutrition_totals() · log_agent_decision() · award_xp() — all live')
+      speak("OrchestratorAgent routes to NutritionAgent, which reads your active plan, calculates today's totals, logs the decision, and awards XP — all in under 3 seconds. Real agentic behavior, not a chatbot.")
       showXp(10)
-      await wait(4500)
+      await wait(11000)
 
       // ── 4. Chat — sleep log ───────────────────────────────────────────────
       step(10, '😴 Chat — Poor Sleep Detected', 'Typing sleep log... RecoveryAgent will reduce workout intensity 40% and update recovery plan')
@@ -408,11 +439,12 @@ export default function AutoDemoRunner({ onLogin, userId }: Props) {
       spot('#chat-input', 6000)
       await typeInto('#chat-input', 'I only slept 4 hours last night, feeling exhausted', 62)
       await wait(600)
-      try { await api.post('/api/logs/sleep', { user_id: uidRef.current, hours: 4, quality_score: 3 }) } catch {}
+      await timed(api.post('/api/logs/sleep', { user_id: uidRef.current, hours: 4, quality_score: 3 }))
       await cursorClick('#chat-send')
       step(11, '⚠️ RecoveryAgent → Intensity Reduced 40%', 'get_recent_logs() · get_active_plan() · create_plan() → Recovery plan updated in MongoDB Atlas')
+      speak("Cross-agent reactivity. Logging 4 hours of sleep triggers RecoveryAgent, which cuts workout intensity by 40 percent, regenerates the recovery plan, and saves updated tips to Atlas — automatically.")
       showXp(10)
-      await wait(4500)
+      await wait(11000)
 
       // ── 5. Chat — workout log ────────────────────────────────────────────
       step(12, '💪 Chat — Logging a Workout', 'WorkoutAgent checks your streak, awards 20 XP, and verifies consistency with your plan')
@@ -420,56 +452,65 @@ export default function AutoDemoRunner({ onLogin, userId }: Props) {
       spot('#chat-input', 5500)
       await typeInto('#chat-input', 'Just finished a 35 minute run this morning', 62)
       await wait(600)
-      try { await api.post('/api/logs/workout', { user_id: uidRef.current, workout_type: 'Cardio — 35min Run', duration_min: 35, calories_burned: 310 }) } catch {}
+      await timed(api.post('/api/logs/workout', { user_id: uidRef.current, workout_type: 'Cardio — 35min Run', duration_min: 35, calories_burned: 310 }))
       await cursorClick('#chat-send')
       step(13, '🏃 WorkoutAgent → Streak Updated!', 'get_active_plan() · log_agent_decision() · award_xp() · update_streak() — 8-day streak!')
+      speak("WorkoutAgent extends Alex's streak to 8 days. AccountabilityAgent awards 20 XP and logs the full tool trace to MongoDB — workout type, duration, and calories, all timestamped.")
       showXp(20)
-      await wait(4500)
+      await wait(10000)
 
       // ── 6. Nutrition page ─────────────────────────────────────────────────
       navRef.current('/plans')
       step(14, '🥗 Nutrition — Day-Wise Meals + Live Calorie Tracking', "Today's meal schedule with planned vs logged calories. Macros tracked per meal in real-time.")
       await wait(1000); window.scrollTo({ top: 0 })
+      speak("The Plans page shows 3 AI-generated plans — nutrition, workout, and recovery — each versioned and attributed to the exact agent that created it.")
       await moveTo('.bg-white.border.border-slate-200.rounded-2xl', 1200)
       spot('.bg-white.border.border-slate-200.rounded-2xl', 2500)
-      await wait(4500)
+      await wait(9000)
 
       // ── 7. Workout tab ────────────────────────────────────────────────────
       await cursorClick('button[data-tab="workout"]')
       step(15, '💪 Workout — Weekly Plan + Today Highlighted', "Today's session shown with a blue ring. Recent logged workouts pulled from MongoDB.")
+      speak("The workout plan is personalized to 4 days per week — push, pull, legs, cardio — based on Alex's goal and activity level.")
       spot('button[data-tab="workout"]', 1200)
-      await wait(4000)
+      await wait(8000)
 
       // ── 8. Recovery tab ───────────────────────────────────────────────────
       await cursorClick('button[data-tab="recovery"]')
       step(16, '😴 Recovery — ⚠️ POOR Status from Sleep Log', 'RecoveryAgent: 4h sleep → intensity -40% → updated recovery tips saved in MongoDB Atlas')
+      speak("The Recovery tab shows the key proof: poor sleep detected, intensity cut 40 percent. RecoveryAgent's auditable live decision — with agent attribution, reason, and timestamp.")
       spot('button[data-tab="recovery"]', 1200)
-      await wait(4000)
+      await wait(9000)
 
       // ── 9. Progress ───────────────────────────────────────────────────────
       navRef.current('/progress')
       step(17, '📈 Progress — Weight Trend + 3-Scenario Forecast', 'ForecastingAgent: Optimistic Aug 1 · Realistic Aug 12 · Pessimistic Sep 5 — auto-updates after every log')
       await wait(700); window.scrollTo({ top: 0 })
-      await wait(4500)
+      speak("Progress shows the weight trend chart and ForecastingAgent's 3-scenario projection — optimistic, realistic, and pessimistic goal completion dates — recalculated after every weight log.")
+      await wait(9000)
 
       // ── 10. Achievements ──────────────────────────────────────────────────
       navRef.current('/achievements')
       step(18, '🏆 Achievements — XP Awarded Live', 'Every agent action awards XP. Watch it update as agents run — persisted in MongoDB gamification collection')
       await wait(700); window.scrollTo({ top: 0 })
-      try { await api.post('/api/gamification/award-xp', { user_id: uidRef.current, xp_amount: 50, reason: 'Demo complete' }) } catch {}
+      speak("Every agent action awards XP. Achievements unlock at health milestones. The entire gamification state lives in MongoDB and updates live across sessions.")
+      await timed(api.post('/api/gamification/award-xp', { user_id: uidRef.current, xp_amount: 50, reason: 'Demo complete' }))
       showXp(50)
-      await wait(3500)
+      await wait(8000)
 
       // ── 11. Profile switcher ──────────────────────────────────────────────
       setProfOverlay(true); setActiveProfIdx(0)
       step(19, '👥 3 Independent Profiles — Each Fully Isolated', 'Alex · Maya · Sam — different goals, plans, agents, and MongoDB data. Watch the switch.')
-      await wait(2800)
+      speak("HealthOS supports fully isolated user profiles. Each has completely independent agents, plans, and MongoDB data.")
+      await wait(5500)
       setActiveProfIdx(1)
       step(20, '💪 Maya Patel — Muscle Gain Mode', 'Level 3 · 580 XP · 2,800 kcal/day · 5x heavy lifting/week — completely separate agent state')
-      await wait(2500)
+      speak("Maya Patel — muscle gain mode. Level 3, 580 XP. 2,800 calories a day, 5-day heavy lifting split.")
+      await wait(6500)
       setActiveProfIdx(2)
       step(21, '🏃 Sam Rivera — Marathon Training Mode', 'Level 4 · 920 XP · 21-day streak · 100km long run Saturdays — WorkoutAgent tailored for endurance')
-      await wait(2500)
+      speak("Sam Rivera — marathon training. Level 4, 920 XP, a 21-day streak. Same architecture, zero data overlap between users.")
+      await wait(6500)
       setProfOverlay(false)
 
       // ── 12. Load Maya ─────────────────────────────────────────────────────
@@ -483,9 +524,10 @@ export default function AutoDemoRunner({ onLogin, userId }: Props) {
       navRef.current('/system')
       step(23, '⚙️ For Judges — All 4 Criteria Met', 'Technological Implementation · Design · Potential Impact · Quality of Idea — 100 pts total')
       await wait(700); window.scrollTo({ top: 0 })
+      speak("The System page maps directly to the judging criteria. Gemini 2.5 Flash for Google Cloud AI. Google ADK for real agentic behavior. MongoDB Atlas as the MCP data layer. All meaningfully integrated — not decorative.")
       await moveTo('.bg-white.border.border-slate-200.rounded-2xl.p-6', 1200)
       spot('.bg-white.border.border-slate-200.rounded-2xl.p-6', 2500)
-      await wait(4500)
+      await wait(10000)
 
       // ── End ───────────────────────────────────────────────────────────────
       const sam = profsRef.current.find((p: any) => p.email === 'sam@demo.healthos')
@@ -494,7 +536,8 @@ export default function AutoDemoRunner({ onLogin, userId }: Props) {
       step(24, '✅ Adaptive HealthOS — Demo Complete', 'Gemini 2.5 Flash + Google Cloud ADK + MongoDB Atlas · github.com/Vivek-Kasturi/adaptive-healthos')
       await wait(700); window.scrollTo({ top: 0 })
       setCursor(s => ({ ...s, visible: false }))
-      await wait(5000)
+      speak("Adaptive HealthOS — where AI agents don't just respond. They act.")
+      await wait(8000)
 
       setDone(true)
     }

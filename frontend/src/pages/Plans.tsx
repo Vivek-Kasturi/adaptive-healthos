@@ -1,6 +1,9 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import { getCurrentPlans, getTodaysFoodLogs, getRecentSleepLogs, getRecentWorkoutLogs, logFood, logWorkout } from '../api/client'
 import { Plan } from '../types'
+import { PlansSkeleton, ErrorState } from '../components/Skeleton'
+
+type AsyncStatus = 'loading' | 'error' | 'success'
 
 interface Props { userId: string }
 
@@ -195,47 +198,62 @@ export default function Plans({ userId }: Props) {
   const [recentWorkouts, setRecentWorkouts] = useState<any[]>(DEMO_WORKOUTS)
   const [lastSleep, setLastSleep] = useState<number>(4)
   const [refreshKey, setRefreshKey] = useState(0)
+  const [status, setStatus] = useState<AsyncStatus>('loading')
 
-  const loadData = () => {
-    getCurrentPlans(userId).then(r => {
-      if (!r.data.plans?.length) return
-      const merged = DEMO_PLANS.map(demo => {
-        const real = r.data.plans.find((p: any) => p.type === demo.type)
-        if (!real) return demo
-        let content: any = real.content || {}
-        if (demo.type === 'nutrition') {
-          if (!content.macros) content = { ...content, macros: { protein_g: content.protein_g ?? (demo.content as any).macros.protein_g, carbs_g: content.carbs_g ?? (demo.content as any).macros.carbs_g, fat_g: content.fat_g ?? (demo.content as any).macros.fat_g } }
-          if (!content.daily_calories) content.daily_calories = real.daily_calories ?? (demo.content as any).daily_calories
-          if (!content.meal_schedule?.length) content.meal_schedule = real.meal_schedule ?? (demo.content as any).meal_schedule
+  const loadData = useCallback(async () => {
+    setStatus('loading')
+    try {
+      const [plansRes, foodRes, workoutRes, sleepRes] = await Promise.allSettled([
+        getCurrentPlans(userId),
+        getTodaysFoodLogs(userId),
+        getRecentWorkoutLogs(userId),
+        getRecentSleepLogs(userId),
+      ])
+
+      if (plansRes.status === 'fulfilled') {
+        const r = plansRes.value
+        if (r.data.plans?.length) {
+          const merged = DEMO_PLANS.map(demo => {
+            const real = r.data.plans.find((p: any) => p.type === demo.type)
+            if (!real) return demo
+            let content: any = real.content || {}
+            if (demo.type === 'nutrition') {
+              if (!content.macros) content = { ...content, macros: { protein_g: content.protein_g ?? (demo.content as any).macros.protein_g, carbs_g: content.carbs_g ?? (demo.content as any).macros.carbs_g, fat_g: content.fat_g ?? (demo.content as any).macros.fat_g } }
+              if (!content.daily_calories) content.daily_calories = real.daily_calories ?? (demo.content as any).daily_calories
+              if (!content.meal_schedule?.length) content.meal_schedule = real.meal_schedule ?? (demo.content as any).meal_schedule
+            }
+            if (demo.type === 'workout' && !content.weekly_schedule?.length) content = { ...content, weekly_schedule: real.weekly_schedule ?? (demo.content as any).weekly_schedule }
+            if (demo.type === 'recovery') {
+              if (!content.sleep_target_hours) content.sleep_target_hours = real.sleep_target_hours ?? (demo.content as any).sleep_target_hours
+              if (!content.recovery_tips?.length) content.recovery_tips = real.recovery_tips ?? (demo.content as any).recovery_tips
+              content.status = real.status ?? content.status
+            }
+            return { ...demo, version: real.version ?? demo.version, created_by_agent: real.created_by_agent ?? demo.created_by_agent, reason_for_update: real.reason_for_update ?? demo.reason_for_update, created_at: real.created_at ?? demo.created_at, content } as typeof demo
+          })
+          setPlans(merged)
         }
-        if (demo.type === 'workout' && !content.weekly_schedule?.length) content = { ...content, weekly_schedule: real.weekly_schedule ?? (demo.content as any).weekly_schedule }
-        if (demo.type === 'recovery') {
-          if (!content.sleep_target_hours) content.sleep_target_hours = real.sleep_target_hours ?? (demo.content as any).sleep_target_hours
-          if (!content.recovery_tips?.length) content.recovery_tips = real.recovery_tips ?? (demo.content as any).recovery_tips
-          content.status = real.status ?? content.status
-        }
-        return { ...demo, version: real.version ?? demo.version, created_by_agent: real.created_by_agent ?? demo.created_by_agent, reason_for_update: real.reason_for_update ?? demo.reason_for_update, created_at: real.created_at ?? demo.created_at, content } as typeof demo
-      })
-      setPlans(merged)
-    }).catch(() => {})
+      }
 
-    getTodaysFoodLogs(userId).then(r => {
-      if (r.data.logs?.length) setFoodLogs(r.data.logs.map((l: any) => l.data || l))
-    }).catch(() => {})
+      if (foodRes.status === 'fulfilled' && foodRes.value.data.logs?.length) {
+        setFoodLogs(foodRes.value.data.logs.map((l: any) => l.data || l))
+      }
 
-    getRecentWorkoutLogs(userId).then(r => {
-      if (r.data.logs?.length) setRecentWorkouts(r.data.logs.map((l: any) => ({ ...(l.data || l), logged_at: l.logged_at })))
-    }).catch(() => {})
+      if (workoutRes.status === 'fulfilled' && workoutRes.value.data.logs?.length) {
+        setRecentWorkouts(workoutRes.value.data.logs.map((l: any) => ({ ...(l.data || l), logged_at: l.logged_at })))
+      }
 
-    getRecentSleepLogs(userId).then(r => {
-      if (r.data.logs?.length) {
-        const latest = r.data.logs[0]
+      if (sleepRes.status === 'fulfilled' && sleepRes.value.data.logs?.length) {
+        const latest = sleepRes.value.data.logs[0]
         setLastSleep(latest?.data?.hours ?? latest?.hours ?? 7)
       }
-    }).catch(() => {})
-  }
 
-  useEffect(() => { loadData() }, [userId, refreshKey])
+      setStatus('success')
+    } catch {
+      setStatus('error')
+    }
+  }, [userId, refreshKey])
+
+  useEffect(() => { loadData() }, [loadData])
 
   const plan = plans.find(p => p.type === activeTab)
   const nutritionContent = plans.find(p => p.type === 'nutrition')?.content as any
@@ -253,6 +271,9 @@ export default function Plans({ userId }: Props) {
 
   const recoveryContent = plans.find(p => p.type === 'recovery')?.content as any
   const recoveryStatus = recoveryContent?.status ?? (lastSleep < 6 ? 'poor' : 'normal')
+
+  if (status === 'loading') return <PlansSkeleton />
+  if (status === 'error')   return <ErrorState message="Could not load your plans. Showing demo data." onRetry={loadData} />
 
   return (
     <div>

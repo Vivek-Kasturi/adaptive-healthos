@@ -1,9 +1,12 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine } from 'recharts'
 import { getProgressSummary, getLatestForecast } from '../api/client'
 import { Forecast } from '../types'
+import { ProgressSkeleton, ErrorState, EmptyState } from '../components/Skeleton'
 
 interface Props { userId: string }
+
+type AsyncStatus = 'loading' | 'error' | 'success'
 
 const DEMO_WEIGHT_DATA = [
   { date: 'May 20', weight: 80.0 },
@@ -28,15 +31,28 @@ const DEMO_FORECAST: Forecast = {
 export default function Progress({ userId }: Props) {
   const [weightData, setWeightData] = useState(DEMO_WEIGHT_DATA)
   const [forecast, setForecast] = useState<Forecast>(DEMO_FORECAST)
+  const [status, setStatus] = useState<AsyncStatus>('loading')
 
-  useEffect(() => {
-    getProgressSummary(userId).then(r => {
-      if (r.data.weight_history?.length) setWeightData(r.data.weight_history)
-    }).catch(() => {})
-    getLatestForecast(userId).then(r => {
-      if (r.data?.current_weight_kg && r.data?.target_weight_kg) setForecast(r.data)
-    }).catch(() => {})
+  const load = useCallback(async () => {
+    setStatus('loading')
+    try {
+      const [summaryRes, forecastRes] = await Promise.allSettled([
+        getProgressSummary(userId),
+        getLatestForecast(userId),
+      ])
+      if (summaryRes.status === 'fulfilled' && summaryRes.value.data.weight_history?.length) {
+        setWeightData(summaryRes.value.data.weight_history)
+      }
+      if (forecastRes.status === 'fulfilled' && forecastRes.value.data?.current_weight_kg) {
+        setForecast(forecastRes.value.data)
+      }
+      setStatus('success')
+    } catch {
+      setStatus('error')
+    }
   }, [userId])
+
+  useEffect(() => { load() }, [load])
 
   const startWeight  = weightData[0]?.weight ?? DEMO_WEIGHT_DATA[0].weight
   const latestWeight = weightData[weightData.length - 1]?.weight ?? DEMO_WEIGHT_DATA[DEMO_WEIGHT_DATA.length - 1].weight
@@ -50,6 +66,10 @@ export default function Progress({ userId }: Props) {
     const parsed = new Date(d)
     return isNaN(parsed.getTime()) ? 'Calculating...' : parsed.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
   }
+
+  if (status === 'loading') return <ProgressSkeleton />
+  if (status === 'error')   return <ErrorState message="Could not load your progress data." onRetry={load} />
+  if (!weightData.length)   return <EmptyState icon="📊" title="No data yet" body="Log your first weight entry to start tracking progress." />
 
   return (
     <div className="space-y-4">

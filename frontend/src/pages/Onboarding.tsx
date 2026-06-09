@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { onboardUser } from '../api/client'
 
 interface Props {
@@ -13,26 +13,51 @@ const ACTIVITY_LABELS: Record<string, string> = {
   very_active: 'Very Active (2x/day)',
 }
 
+const PERSIST_KEY = 'healthos_onboarding_form'
+const STEP_KEY    = 'healthos_onboarding_step'
+
+const DEFAULT_FORM = {
+  name: '',
+  email: '',
+  age: '',
+  height_cm: '',
+  weight_kg: '',
+  sex: 'male',
+  activity_level: 'moderate',
+  goal_type: 'weight_loss',
+  target_weight_kg: '',
+  target_date: '',
+  weekly_workout_days: '3',
+}
+
+function loadSaved() {
+  try {
+    const raw = localStorage.getItem(PERSIST_KEY)
+    return raw ? { ...DEFAULT_FORM, ...JSON.parse(raw) } : DEFAULT_FORM
+  } catch { return DEFAULT_FORM }
+}
+
+function loadStep() {
+  try { return Number(localStorage.getItem(STEP_KEY)) || 1 } catch { return 1 }
+}
+
 export default function Onboarding({ onComplete }: Props) {
-  const [step, setStep] = useState(1)
+  const [step, setStep] = useState(loadStep)
   const [loading, setLoading] = useState(false)
   const [agentActivity, setAgentActivity] = useState('')
 
-  const [form, setForm] = useState({
-    name: '',
-    email: '',
-    age: '',
-    height_cm: '',
-    weight_kg: '',
-    sex: 'male',
-    activity_level: 'moderate',
-    goal_type: 'weight_loss',
-    target_weight_kg: '',
-    target_date: '',
-    weekly_workout_days: '3',
-  })
+  const [form, setForm] = useState(loadSaved)
 
-  const set = (k: string, v: string) => setForm(f => ({ ...f, [k]: v }))
+  // Persist form + step on every change
+  useEffect(() => {
+    try { localStorage.setItem(PERSIST_KEY, JSON.stringify(form)) } catch {}
+  }, [form])
+
+  useEffect(() => {
+    try { localStorage.setItem(STEP_KEY, String(step)) } catch {}
+  }, [step])
+
+  const set = (k: string, v: string) => setForm((f: typeof DEFAULT_FORM) => ({ ...f, [k]: v }))
 
   const handleSubmit = async () => {
     setLoading(true)
@@ -61,6 +86,9 @@ export default function Onboarding({ onComplete }: Props) {
       setTimeout(() => setAgentActivity('WorkoutAgent: Building your workout schedule...'), 2400)
       const res = await onboardUser(payload)
       const userId = res.data.user_id
+      // Clear persisted draft on successful submission
+      localStorage.removeItem(PERSIST_KEY)
+      localStorage.removeItem(STEP_KEY)
       setTimeout(() => {
         setAgentActivity('✓ All plans generated and saved to MongoDB!')
         setTimeout(() => onComplete(userId), 800)
@@ -73,6 +101,8 @@ export default function Onboarding({ onComplete }: Props) {
       setTimeout(() => {
         setAgentActivity('✓ Plans generated! (demo mode)')
         const demoId = `demo_${Date.now()}`
+        localStorage.removeItem(PERSIST_KEY)
+        localStorage.removeItem(STEP_KEY)
         setTimeout(() => onComplete(demoId), 800)
       }, 3500)
     } finally {

@@ -2,11 +2,16 @@
 Demo runner — executes full scripted scenarios for the hackathon video.
 POST /api/demo/seed-profiles — seeds all 3 demo profiles
 POST /api/demo/run            — legacy single user demo
+POST /api/demo/tts            — speak text via macOS `say` (perfectly-synced voiceover)
 """
 from fastapi import APIRouter
 import asyncio
 import logging
+import subprocess as _subprocess
 from datetime import datetime, timedelta
+
+# ── TTS process tracker — one `say` at a time ─────────────────────────────────
+_say_proc: "None | _subprocess.Popen[bytes]" = None
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -370,3 +375,60 @@ async def demo_status(user_id: str):
         "has_nutrition_plan": await get_active_plan(user_id, "nutrition") is not None,
         "has_forecast": await get_latest_forecast(user_id) is not None,
     }
+
+
+# ── TTS voiceover endpoint — triggered by AutoDemoRunner for perfect sync ─────
+
+class TtsRequest:
+    def __init__(self, text: str, voice: str = "Samantha", rate: int = 165):
+        self.text = text
+        self.voice = voice
+        self.rate = rate
+
+from pydantic import BaseModel
+
+class TtsPayload(BaseModel):
+    text: str
+    voice: str = "Samantha"
+    rate: int = 165
+
+@router.post("/tts")
+async def demo_tts(payload: TtsPayload):
+    """
+    Speak text via macOS built-in `say` command.
+    Called by AutoDemoRunner at each step for perfectly-synced voiceover.
+    Kills any currently-running speech before starting new one.
+    """
+    global _say_proc
+    # Kill previous speech immediately so segments never overlap
+    if _say_proc and _say_proc.poll() is None:
+        _say_proc.terminate()
+        _say_proc = None
+
+    text = payload.text.strip()
+    if not text:
+        return {"ok": True, "spoken": ""}
+
+    try:
+        _say_proc = _subprocess.Popen(
+            ["say", "-v", payload.voice, "-r", str(payload.rate), text],
+            stdout=_subprocess.DEVNULL,
+            stderr=_subprocess.DEVNULL,
+        )
+    except FileNotFoundError:
+        # `say` not available (non-macOS environment — ignore silently)
+        pass
+
+    preview = text[:60] + "..." if len(text) > 60 else text
+    logger.info(f"[TTS] {preview}")
+    return {"ok": True, "spoken": preview}
+
+
+@router.post("/tts/stop")
+async def demo_tts_stop():
+    """Stop any currently-running speech immediately."""
+    global _say_proc
+    if _say_proc and _say_proc.poll() is None:
+        _say_proc.terminate()
+        _say_proc = None
+    return {"ok": True}
