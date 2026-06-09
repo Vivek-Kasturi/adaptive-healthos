@@ -1,5 +1,8 @@
 """
-NutritionAgent — analyzes food logs, manages nutrition plans via MongoDB MCP tools.
+NutritionAgent — analyzes food logs, manages nutrition plans.
+Database operations connect to MongoDB Atlas via mongodb_tools.
+The HealthOS MongoDB MCP Server (mcp_server.py) exposes these same
+operations over the Model Context Protocol for external MCP clients.
 """
 from google.adk.agents import LlmAgent
 from google.adk.tools import FunctionTool
