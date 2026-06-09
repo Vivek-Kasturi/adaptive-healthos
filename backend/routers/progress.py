@@ -1,7 +1,7 @@
 """
 Progress routes — weight trend analysis and forecast generation.
 """
-from fastapi import APIRouter
+from fastapi import APIRouter, BackgroundTasks
 from tools.mongodb_tools import get_recent_logs, get_latest_forecast, get_user
 import logging
 
@@ -9,15 +9,29 @@ router = APIRouter()
 logger = logging.getLogger(__name__)
 
 
+async def _run_progress_agent_bg(user_id: str, weight_count: int):
+    """Background task — runs ProgressAnalysisAgent without blocking the response."""
+    if weight_count < 3:
+        return
+    try:
+        from agents.runner import run_agent
+        from agents.progress_agent import progress_agent
+        result = await run_agent(
+            progress_agent,
+            user_id=user_id,
+            message=f"Analyze progress for user_id={user_id}. Generate forecast and insights.",
+        )
+        logger.info(f"ProgressAnalysisAgent (bg) for {user_id}: tools={result.get('tools_used', [])}")
+    except Exception as e:
+        logger.error(f"ProgressAnalysisAgent bg error: {e}")
+
+
 @router.get("/summary")
-async def get_progress_summary(user_id: str):
+async def get_progress_summary(user_id: str, background_tasks: BackgroundTasks):
     """
     Full progress summary — weight trend + log counts.
-    Triggers ProgressAnalysisAgent if enough data exists.
+    Returns immediately from MongoDB; triggers ProgressAnalysisAgent in background.
     """
-    from agents.runner import run_agent
-    from agents.progress_agent import progress_agent
-
     weights = await get_recent_logs(user_id, "weight", limit=30)
     workouts = await get_recent_logs(user_id, "workout", limit=30)
     food_logs = await get_recent_logs(user_id, "food", limit=30)
@@ -36,19 +50,9 @@ async def get_progress_summary(user_id: str):
         trend_kg = round(total_change, 2)
         weekly_rate = round(total_change / max(len(weight_values) - 1, 1) * 7, 2)
 
-    # Run ProgressAnalysisAgent if we have enough data
+    # Fire agent in background — doesn't block the response
+    background_tasks.add_task(_run_progress_agent_bg, user_id, len(weight_values))
     agent_insight = ""
-    if len(weight_values) >= 3:
-        try:
-            result = await run_agent(
-                progress_agent,
-                user_id=user_id,
-                message=f"Analyze progress for user_id={user_id}. Generate forecast and insights.",
-            )
-            agent_insight = result.get("response", "")
-            logger.info(f"ProgressAnalysisAgent ran for {user_id}: tools={result.get('tools_used', [])}")
-        except Exception as e:
-            logger.error(f"ProgressAnalysisAgent error: {e}")
 
     # Build weight history for chart — oldest first, formatted for Recharts
     weight_history = []
